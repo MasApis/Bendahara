@@ -1,0 +1,40 @@
+name: Bot Pengingat Kas Otomatis
+
+on:
+  schedule:
+    # Berjalan otomatis setiap hari jam 01:00 UTC (Sama dengan Jam 08:00 WIB pagi)
+    - cron: '0 1 * * *'
+  workflow_dispatch: # Tombol rahasia agar kita bisa tes jalankan manual kapan saja
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Eksekusi Bot Pengingat
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets."type": "service_account",
+          "project_id": "bendahara-bcf09",
+          "private_key_id": "ea4c40373e8f2e27dbc79595b22b133cb5df918a",
+          "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCTk4xtgGdbOaTZ\nGuvu53xcBidxgEaX2bDULv2jzaBIN2W1bdBeHAETvZR4r9JEvr/MlhZqtK1IEDyB\n8UMB+k/pq2LZhfifOsxctF8P2nM6sctKUlR93HSnMp3i3O1JFYWDIO62HtkMHMpy\nY5fsHDiWNXXA1MMLOBJ75NB43Lr4Jg4FT56oCWY3h72nPV1KT3dR7eM/3/hmB2XQ\n0aTVbPHZkgo++4coGoiP/xbIRSxaMFnoPI9ya8WpWFw9ZKjvQ4IYg7N0V1sDZkgI\nGTjmNMNhbBgjfhtEHCtxI0Jzd3wRPWgOd2WOrOJFaRbghSDPZsUy3/3OuITMqGSq\nplaJ98bVAgMBAAECggEACe80FBgBfSzhecL78HJxVvGMHLIlrmm3Y2VBalI4kLv3\n8xFwJjGs6eMIeGJfnYSYvUE6Q5cjlhcPt7Ch0eODlyeUKTABV1i6MqBqyNKsEJ6w\n4HEv4mQhjzLTWZcFOzcBbJ0eLLDhbBURFMe7DagtsADryx4Xfi0ZY3E5DnXPeU5e\nVmXiqRKRXVC/6v2cTRpELXbud5ZHd2sOS1S7x3lq8bQ35IE0Hu+ZTL/v1Vt/A51w\noyYxVI9XdS2+0U4AY9PZadqssxjknjcTqgXbjKfzBwzTNVQOet7zvma/GtWpVyKG\nN/iBy6i4bdYtgck9UcaEMLcTG5hQT4RU6OUt7NbhIQKBgQDDMnXbtZ4+DvHKQZ9C\nQIZ3d68tPYZVjPfzig/6gV13+omccjbmCtS6TFhU6cBEp2ogdn4cxGOnSajWMkpV\nEdDUDGpdlSDIOkB/UlZFMIV5JeP98EJngFKa1TsFE4wkXzOR7XHHeBCUkuUVVyF6\nB2HVmW0TkSxtRf/SYUYo6CNiYQKBgQDBi66onqTAjvBBi5DFgj64O+XYx9v50ZaM\nsx676bb9ZYPnirLsgxyQX3YnrL3z8zc+/sYJQmV7m3S+G+IS4oakQgeiVebYs6qV\n4x9tmCYtJYiUoL5Ypv7XZVGo4RYN/6g+Z07yskRFio7WS1RpzwkZ8hHNhZPfe10v\nLZcVA16g9QKBgCfIaAbwfCDv0M3FFB1fo0hEB1r0GCXlhj+HmvwWU6N5V4SgLpoy\nCOszVilwPrR/XnzhSZC5YgodVCDbvRSbffFJ2n/aPgUxAiYw9M5DNmDbnR0LU61e\nlPdjkBTXyA89q/gI6dCaot51FeWEjZkeWg07qOR9CQ34X0xUcQUzUsrhAoGAadTz\ngIifFhwTDARA+X8qxJscJ9nBU21joTQgzigSQ6VK50VUaTeYWumYNkGi7M5Fm1C9\nATspOtnakEm26RStAwyIGCBYxo4X7TXwbYEQ/wbTFFKBQwCtwSJJ8MqDwMvXN6hN\n5y/LXStSx6MRWXo4Q9O2IGe2YDGY1r9bKcZZ7DECgYBSR0zbcVwHcSBNTU/d3q7T\nfpAfLv2ePwwrnnT9mZfGvXB16v+G4wJudOPc2eaPTcIkywvBizsDMdgr9DrLiOf0\n7bTTZy7QDcvnMceLeYhcS0izTdsBcH6ZCJmS73pXaIiyrcCCl+9ZClSIKOEqM//Y\ns4e1NBjvk6eJeM8jq3UCqA==\n-----END PRIVATE KEY-----\n",
+          "client_email": "firebase-adminsdk-fbsvc@bendahara-bcf09.iam.gserviceaccount.com",
+          "client_id": "112668541764859977864",
+          "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+          "token_uri": "https://oauth2.googleapis.com/token",
+          "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+          "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40bendahara-bcf09.iam.gserviceaccount.com",
+          "universe_domain": "googleapis.com" }}
+          GREEN_API_INSTANCE_ID: ${{ secrets.7107638313 }}
+          GREEN_API_API_TOKEN: ${{ secrets.547bd0b852a24466a3318e924c9574904b3f85dd59b1479cab }}
+          GREEN_API_CHAT_ID: ${{ secrets.120363367675503061 }}
+        run: node cron-reminder.js

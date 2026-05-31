@@ -23,6 +23,7 @@ jobs:
 
       - name: Eksekusi Bot Pengingat
         env:
+          TZ: Asia/Jakarta
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           GREEN_API_INSTANCE_ID: ${{ secrets.GREEN_API_INSTANCE_ID }}
           GREEN_API_API_TOKEN: ${{ secrets.GREEN_API_API_TOKEN }}

@@ -4,7 +4,7 @@ on:
   schedule:
     # Berjalan otomatis setiap hari jam 01:00 UTC (Sama dengan Jam 08:00 WIB pagi)
     - cron: '0 1 * * *'
-  workflow_dispatch: # Tombol rahasia agar kita bisa tes jalankan manual kapan saja
+  workflow_dispatch: # Tombol rahasia agar bisa tes jalankan manual
 
 jobs:
   run-bot:

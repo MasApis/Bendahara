@@ -1,10 +1,14 @@
-const admin = Require('firebase-admin');
-const axios = Require('axios');
+import admin from 'firebase-admin';
+import axios from 'axios';
+import { createRequire } from 'module';
+
+// Membuat fungsi require manual agar fallback ke file JSON lokal tetap aman di mode ESM
+const requireManual = createRequire(import.meta.url);
 
 // Mengambil service account dari environment variable yang disuntikkan GitHub Actions
 const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) 
-    : Require('./path-to-local-serviceAccountKey.json'); // fallback untuk lokal testing
+    : requireManual('./path-to-local-serviceAccountKey.json'); // fallback untuk lokal testing
 
 if (!admin.apps.length) {
     admin.initializeApp({

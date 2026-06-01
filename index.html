@@ -14,15 +14,14 @@
         .wa-bubble { background-color: #dcf8c6; border-radius: 8px; border-top-left-radius: 0; box-shadow: 0 1px 0.5px rgba(0,0,0,0.13); }
     </style>
 
-    <!-- FIREBASE SDK (MODULAR) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // =======================================================
-        // TODO: PASTIKAN INI ADALAH CONFIG FIREBASE ASLI MILIKMU
-        // =======================================================
+        // ==========================================
+        // KONFIGURASI FIREBASE (DARI FILE ASLI)
+        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyCIg-Cz0Up6wsxnkwknENR_durvd82MukA",
             authDomain: "bendahara-bcf09.firebaseapp.com",
@@ -32,310 +31,245 @@
             appId: "1:242756926048:web:b1e0e35eec1db1339ba105",
             measurementId: "G-X4JGK2PH32"
         };
-        // Kredensial Green-API untuk menarik daftar grup (Ganti dengan token aslimu untuk presentasi)
-        const CENTRAL_GREEN_API = {
-            idInstance: "", 
-            apiTokenInstance: ""
-        };
 
-        // LOGIKA UTAMA: PROSES OTENTIKASI & REGISTRASI AWAL
-        document.getElementById('btn-login').addEventListener('click', async () => {
-            const inputtedCode = document.getElementById('secret-code').value.trim();
-            const idInstance = document.getElementById('input-id-instance').value.trim();
-            const tokenInstance = document.getElementById('input-token-instance').value.trim();
-
-            // 1. Validasi Input Kosong
-            if (!inputtedCode || !idInstance || !tokenInstance) {
-                return alert("⚠️ Mohon lengkapi semua kolom! Kode Rahasia, ID Instance, dan API Token wajib diisi.");
-            }
-
-            const btnLogin = document.getElementById('btn-login');
-            btnLogin.disabled = true;
-            btnLogin.textContent = "Memverifikasi Kode Akses...";
-
-            try {
-                // 2. AMBIL KODE RAHASIA SECARA LIVE DARI FIRESTORE (TIDAK HARDCODED LAGI!)
-                const configDocRef = doc(db, "app_config", "access_keys");
-                const configSnap = await getDoc(configDocRef);
-
-                if (!configSnap.exists()) {
-                    btnLogin.disabled = false;
-                    btnLogin.textContent = "Verifikasi & Masuk via Google";
-                    return alert("❌ Terjadi kesalahan sistem: Konfigurasi akses tidak ditemukan di server.");
-                }
-
-                const serverSecretCode = configSnap.data().secret_code;
-
-                // 3. Validasi Kode Rahasia dari Server
-                if (inputtedCode !== serverSecretCode) {
-                    btnLogin.disabled = false;
-                    btnLogin.textContent = "Verifikasi & Masuk via Google";
-                    return alert("❌ Kode rahasia salah! Anda tidak memiliki izin akses ke sistem ini.");
-                }
-
-                // 4. Jika Kode Benar, Lanjutkan Google Login Popup
-                btnLogin.textContent = "Membuka Google Auth...";
-                const result = await signInWithPopup(auth, provider);
-                const user = result.user;
-
-                // Ambil data user yang sudah ada di database (jika ada)
-                const userDocRef = doc(db, "users", user.uid);
-                const docSnap = await getDoc(userDocRef);
-
-                let currentSchedules = {};
-                if (docSnap.exists()) {
-                    currentSchedules = docSnap.data().schedulesByMonth || {};
-                }
-
-                // 5. Integrasikan Kredensial ke dalam Payload Firestore
-                const initPayload = {
-                    greenApiConfig: {
-                        idInstance: idInstance,
-                        apiTokenInstance: tokenInstance,
-                        selectedGroups: docSnap.exists() ? (docSnap.data().greenApiConfig?.selectedGroups || []) : []
-                    },
-                    schedulesByMonth: currentSchedules
-                };
-
-                // Amankan data kredensial baru langsung ke Firestore
-                await setDoc(userDocRef, initPayload, { merge: true });
-
-                // Ambil data snapshot terbaru untuk login ke dashboard
-                const updatedSnap = await getDoc(userDocRef);
-                
-                // Sembunyikan login screen dan masuk dashboard
-                document.getElementById('screen-login').classList.add('hidden');
-                masukDashboard(user, updatedSnap.data());
-
-            } catch (error) {
-                console.error("Authentication Error:", error);
-                alert("Gagal melakukan proses verifikasi atau login Google.");
-            } finally {
-                btnLogin.disabled = false;
-                btnLogin.textContent = "Verifikasi & Masuk via Google";
-            }
-        });
+        const CENTRAL_GREEN_API = { idInstance: "", apiTokenInstance: "" };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
-        // Elemen Layar (Screens)
-        const screenLogin = document.getElementById('screen-login');
-        const screenAccessCode = document.getElementById('screen-access-code');
-        const screenDashboard = document.getElementById('screen-dashboard');
-        const loaderGlobal = document.getElementById('loader-global');
-
-        // Elemen Akses & Auth
-        const btnLogin = document.getElementById('btn-login');
-        const btnLogout = document.getElementById('btn-logout');
-        const btnVerifyCode = document.getElementById('btn-verify-code');
-        const inputAccessCode = document.getElementById('input-access-code');
-        const textUserEmailWait = document.getElementById('text-user-email-wait');
-
-        let currentUser = null;
-        let localSchedulesObject = {}; // Menampung jadwal per-bulan dari database
+        let localSchedulesObject = {}; 
         let selectedGroups = [];
 
-        // FUNGSI 1: GENERATE BULAN DINAMIS (6 Bulan ke depan)
-        function generateDynamicMonths() {
-            const selectBulan = document.getElementById('bulan-target');
-            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        // ==========================================
+        // 1. FUNGSI PEMBILAS MEMORI (ISOLASI DATA)
+        // ==========================================
+        function resetGlobalState() {
+            localSchedulesObject = {};
+            selectedGroups = [];
+            CENTRAL_GREEN_API.idInstance = "";
+            CENTRAL_GREEN_API.apiTokenInstance = "";
             
-            const today = new Date();
-            const currentYear = today.getFullYear();
-            const currentMonthIndex = today.getMonth(); // 0 = Jan, 5 = Jun
+            document.getElementById('selected-groups-chips').innerHTML = '<p class="text-xs text-slate-400 italic w-full text-center mt-2">Belum ada grup yang ditambahkan.</p>';
+            document.getElementById('count-selected').textContent = "0";
+            document.getElementById('select-group').innerHTML = '<option value="">-- Pilih Grup Tagihan Kas --</option>';
             
-            let optionsHTML = "";
-            // Looping dimulai dari bulan saat ini, sampai Desember (indeks 11)
-            for(let i = currentMonthIndex; i < 12; i++) {
-                let monthStr = `${monthNames[i]} ${currentYear}`;
-                optionsHTML += `<option value="${monthStr}">${monthStr}</option>`;
-            }
-            selectBulan.innerHTML = optionsHTML;
-
-            // Trigger saat bendahara mengganti bulan di dropdown
-            selectBulan.addEventListener('change', (e) => {
-                loadDanEditJadwalBulan(e.target.value);
-            });
+            // Cek existensi elemen sebelum reset agar tidak error di memory
+            if(document.getElementById('input-id-instance')) document.getElementById('input-id-instance').value = "";
+            if(document.getElementById('input-token-instance')) document.getElementById('input-token-instance').value = "";
         }
 
-        // FUNGSI 2: AUTH & ROUTING SCREEN
-        btnLogin.addEventListener('click', () => signInWithPopup(auth, provider).catch(console.error));
-        btnLogout.addEventListener('click', () => signOut(auth).catch(console.error));
+        // ==========================================
+        // 2. GERBANG UTAMA: VALIDASI TIKET & LOGIN
+        // ==========================================
+        document.getElementById('btn-login').addEventListener('click', async () => {
+            const inputtedCode = document.getElementById('secret-code').value.trim();
+            if (!inputtedCode) return alert("⚠️ Mohon masukkan Kode Rahasia Akses terlebih dahulu!");
 
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                currentUser = user;
-                screenLogin.classList.add('hidden');
-                loaderGlobal.classList.remove('hidden');
+            const btnLogin = document.getElementById('btn-login');
+            btnLogin.disabled = true;
+            btnLogin.innerHTML = `<svg class="animate-spin h-5 w-5 mr-3 text-white inline" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Memverifikasi...`;
 
-                // Cek database, apakah user ini sudah pernah diverifikasi?
-                const docRef = doc(db, "users", user.uid);
-                const docSnap = await getDoc(docRef);
+            try {
+                // Tarik validasi live dari Firestore
+                const configDocRef = doc(db, "app_config", "access_keys");
+                const configSnap = await getDoc(configDocRef);
+                const serverSecretCode = configSnap.exists() ? configSnap.data().secret_code : null;
 
-                loaderGlobal.classList.add('hidden');
-
-                if (docSnap.exists() && docSnap.data().isVerified === true) {
-                    // Jika sudah terverifikasi, langsung masuk dashboard
-                    masukDashboard(user, docSnap.data());
-                } else {
-                    // Jika belum terverifikasi (User Baru), minta kode akses
-                    textUserEmailWait.textContent = user.email;
-                    screenAccessCode.classList.remove('hidden');
+                if (inputtedCode !== serverSecretCode) {
+                    btnLogin.disabled = false;
+                    btnLogin.textContent = "Verifikasi & Masuk via Google";
+                    return alert("❌ Kode rahasia salah! Akses ditolak.");
                 }
+
+                // Jika valid, panggil Google Auth Popup
+                btnLogin.textContent = "Membuka Auth...";
+                await signInWithPopup(auth, provider);
+                
+            } catch (error) {
+                console.error("Auth Error:", error);
+                alert("Gagal memproses verifikasi atau login Google.");
+                btnLogin.disabled = false;
+                btnLogin.textContent = "Verifikasi & Masuk via Google";
+            }
+        });
+
+        // LOGOUT
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            signOut(auth).then(() => {
+                resetGlobalState();
+                location.reload();
+            }).catch(console.error);
+        });
+
+        // ==========================================
+        // 3. STATE OBSERVER (ANTI-BYPASS)
+        // ==========================================
+        onAuthStateChanged(auth, async (user) => {
+            const screenLogin = document.getElementById('screen-login');
+            const screenDashboard = document.getElementById('screen-dashboard');
+            const loaderGlobal = document.getElementById('loader-global');
+
+            if (user) {
+                loaderGlobal.classList.remove('hidden');
+                
+                const userDocRef = doc(db, "users", user.uid);
+                const docSnap = await getDoc(userDocRef);
+                
+                loaderGlobal.classList.add('hidden');
+                screenLogin.classList.add('hidden');
+                
+                let userData = docSnap.exists() ? docSnap.data() : { schedulesByMonth: {}, greenApiConfig: { idInstance: "", apiTokenInstance: "", selectedGroups: [] } };
+                
+                if (!docSnap.exists()) {
+                    await setDoc(userDocRef, userData);
+                }
+
+                masukDashboard(user, userData);
             } else {
-                currentUser = null;
+                resetGlobalState();
                 screenLogin.classList.remove('hidden');
-                screenAccessCode.classList.add('hidden');
                 screenDashboard.classList.add('hidden');
                 loaderGlobal.classList.add('hidden');
             }
         });
 
-        // FUNGSI 3: VERIFIKASI KODE AKSES DARI DEVELOPER
-        btnVerifyCode.addEventListener('click', async () => {
-            const code = inputAccessCode.value.trim();
-            if (code === DEVELOPER_SECRET_CODE) {
-                btnVerifyCode.textContent = "Memverifikasi...";
-                try {
-                    // Simpan status verified ke Firestore agar besok tidak ditanya lagi
-                    await setDoc(doc(db, "users", currentUser.uid), { 
-                        isVerified: true,
-                        email: currentUser.email,
-                        registeredAt: new Date().toISOString()
-                    }, { merge: true });
-                    
-                    screenAccessCode.classList.add('hidden');
-                    masukDashboard(currentUser, {});
-                } catch (error) {
-                    alert("Gagal mengamankan sesi. Pastikan Firestore rules Anda mengizinkan write.");
-                    btnVerifyCode.textContent = "Verifikasi Kode";
-                }
-            } else {
-                alert("Kode akses salah atau kadaluarsa! Hubungi Developer.");
-            }
-        });
-
-        // FUNGSI 4: SETUP DASHBOARD PRO
+        // ==========================================
+        // 4. ROUTING DASHBOARD & FORM SETUP BERSYARAT
+        // ==========================================
         function masukDashboard(user, dbData) {
-            screenDashboard.classList.remove('hidden');
-            
+            document.getElementById('screen-dashboard').classList.remove('hidden');
             document.getElementById('user-name').textContent = user.displayName;
             document.getElementById('user-email').textContent = user.email;
             document.getElementById('user-avatar').src = user.photoURL || 'https://ui-avatars.com/api/?name=Admin';
 
-            // 1. Ambil data kredensial Green-API secara dinamis dari Firestore user
-            if (dbData.greenApiConfig) {
-                CENTRAL_GREEN_API.idInstance = dbData.greenApiConfig.idInstance || "";
-                CENTRAL_GREEN_API.apiTokenInstance = dbData.greenApiConfig.apiTokenInstance || "";
-            }
-
-            // Ambil data jadwal multi-bulan dari database
-            localSchedulesObject = dbData.schedulesByMonth || {};
-
-            generateDynamicMonths();
-            initGroupSelectionLogic();
-            initLivePreview();
+            const configWA = dbData.greenApiConfig || {};
             
-            // AUTO-LOAD CHIPS GRUP DARI DATA FIRESTORE LAMA (JIKA ADA)
-            if (dbData.greenApiConfig?.selectedGroups) {
-                window.renderSelectedGroupsChips(dbData.greenApiConfig.selectedGroups);
-            }
-            
-            const bulanAwal = document.getElementById('bulan-target').value;
-            loadDanEditJadwalBulan(bulanAwal);
-
-            fetchWhatsAppGroups();
-            cekKoneksiWhatsApp();
-
-            // 3. Jalankan fungsi pengecekan (Sekarang aman karena token sudah terisi dari Firestore)
-            if (CENTRAL_GREEN_API.idInstance && CENTRAL_GREEN_API.apiTokenInstance) {
-                cekKoneksiWhatsApp();
+            // CEK JIKA AKUN BARU / WA KOSONG
+            if (!configWA.idInstance || !configWA.apiTokenInstance) {
+                document.getElementById('setup-wa-gateway-form').classList.remove('hidden');
+                document.getElementById('main-dashboard-content').classList.add('hidden');
             } else {
-                document.getElementById('status-gateway-container').innerHTML = `
-                    <span class="text-[11px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg font-semibold">
-                        ⚠️ Kredensial WA Belum Di-set di Firestore
-                    </span>
-                `;
+                // JIKA AKUN LAMA, TAMPILKAN DASHBOARD UTAMA
+                document.getElementById('setup-wa-gateway-form').classList.add('hidden');
+                document.getElementById('main-dashboard-content').classList.remove('hidden');
+
+                CENTRAL_GREEN_API.idInstance = configWA.idInstance;
+                CENTRAL_GREEN_API.apiTokenInstance = configWA.apiTokenInstance;
+                localSchedulesObject = dbData.schedulesByMonth || {};
+
+                // Isi nilai shadow input
+                document.getElementById('input-id-instance').value = configWA.idInstance;
+                document.getElementById('input-token-instance').value = configWA.apiTokenInstance;
+
+                // Load ulang data & fitur
+                generateDynamicMonths();
+                initGroupSelectionLogic();
+                initLivePreview();
+                
+                if (configWA.selectedGroups) {
+                    window.renderSelectedGroupsChips(configWA.selectedGroups);
+                }
+                
+                const bulanAwal = document.getElementById('bulan-target').value;
+                loadDanEditJadwalBulan(bulanAwal);
+                cekKoneksiWhatsApp();
             }
         }
 
-        // FUNGSI 5: LOGIK UI DROPDOWN & CHIPS GRUP
+        // AKSI SIMPAN SETUP WA KHUSUS AKUN BARU
+        document.getElementById('btn-save-setup-wa').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if(!user) return;
+
+            const idInst = document.getElementById('setup-id-instance').value.trim();
+            const tokInst = document.getElementById('setup-token-instance').value.trim();
+
+            if(!idInst || !tokInst) return alert("⚠️ Mohon isi ID Instance dan Token WhatsApp Anda!");
+
+            try {
+                const btnSetup = document.getElementById('btn-save-setup-wa');
+                btnSetup.disabled = true;
+                btnSetup.textContent = "Menyimpan...";
+
+                await setDoc(doc(db, "users", user.uid), {
+                    greenApiConfig: { idInstance: idInst, apiTokenInstance: tokInst, selectedGroups: [] }
+                }, { merge: true });
+                
+                alert("🎉 Integrasi WhatsApp Berhasil Diaktifkan!");
+                location.reload();
+            } catch (e) {
+                alert("Gagal mengonfigurasi basis data server.");
+            }
+        });
+
+        // ==========================================
+        // 5. KUMPULAN FUNGSI FITUR BAWAAN
+        // ==========================================
+        function generateDynamicMonths() {
+            const selectBulan = document.getElementById('bulan-target');
+            const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const today = new Date();
+            let optionsHTML = "";
+            for(let i = today.getMonth(); i < 12; i++) {
+                let monthStr = `${monthNames[i]} ${today.getFullYear()}`;
+                optionsHTML += `<option value="${monthStr}">${monthStr}</option>`;
+            }
+            selectBulan.innerHTML = optionsHTML;
+            selectBulan.onchange = (e) => loadDanEditJadwalBulan(e.target.value);
+        }
+
         function initGroupSelectionLogic() {
             const selectGrup = document.getElementById('select-group');
             const btnAddGrup = document.getElementById('btn-add-group');
             const containerChips = document.getElementById('selected-groups-chips');
             const badgeCount = document.getElementById('count-selected');
 
-            // Fungsi internal untuk me-render Chips ke layar
             window.renderSelectedGroupsChips = function(groupsArray) {
                 selectedGroups = groupsArray || [];
                 containerChips.innerHTML = '';
-                
                 if (selectedGroups.length === 0) {
                     containerChips.innerHTML = '<p class="text-xs text-slate-400 italic w-full text-center mt-2">Belum ada grup yang ditambahkan.</p>';
                     badgeCount.textContent = "0";
                     return;
                 }
-
                 selectedGroups.forEach((grup, index) => {
                     const chip = document.createElement('div');
-                    chip.className = "inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium px-2.5 py-1.5 rounded-lg";
-                    chip.innerHTML = `
-                        <span>${grup.name}</span>
-                        <button type="button" class="text-indigo-400 hover:text-indigo-800 focus:outline-none cursor-pointer" onclick="window.removeGroup(${index})">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        </button>
-                    `;
+                    chip.className = "inline-flex items-center gap-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium px-2.5 py-1.5 rounded-lg mb-2";
+                    chip.innerHTML = `<span>${grup.name}</span><button type="button" class="text-indigo-400 hover:text-indigo-800 cursor-pointer" onclick="window.removeGroup(${index})">⏱️</button>`;
                     containerChips.appendChild(chip);
                 });
                 badgeCount.textContent = selectedGroups.length;
             };
 
-            // Fungsi global untuk menghapus grup saat tanda "x" diklik
             window.removeGroup = function(index) {
                 selectedGroups.splice(index, 1);
                 window.renderSelectedGroupsChips(selectedGroups);
             };
 
-            // Event klik tombol "+ Tambah"
-            btnAddGrup.addEventListener('click', () => {
+            btnAddGrup.onclick = () => {
                 const val = selectGrup.value;
                 const text = selectGrup.options[selectGrup.selectedIndex].text;
-                
-                if(!val) return alert("Pilih grup dari dropdown terlebih dahulu!");
-                
-                // Validasi duplikasi data
-                if(selectedGroups.find(g => g.id === val)) {
-                    return alert("Grup ini sudah ada di dalam daftar target!");
-                }
-
+                if(!val || val.startsWith("--")) return alert("Pilih grup asli!");
+                if(selectedGroups.find(g => g.id === val)) return alert("Grup sudah ada!");
                 selectedGroups.push({ id: val, name: text });
                 window.renderSelectedGroupsChips(selectedGroups);
-            });
+            };
         }
 
-        // FUNGSI 6: LIVE PREVIEW
         function initLivePreview() {
             const inputTemplate = document.getElementById('template-pesan');
             const inputBulan = document.getElementById('bulan-target');
             const previewText = document.getElementById('preview-text');
-            
-            inputTemplate.value = "Halo kawan-kawan [NAMA_GRUP]! 👋\n\nIni adalah pengingat otomatis untuk kas periode *[BULAN]*.\n\nMohon bagi yang belum melunasi agar segera transfer ke:\nBCA: 12345678 a.n Bendahara\n\nTerima kasih! 🙏";
 
             document.querySelectorAll('.var-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
+                btn.onclick = (e) => {
                     const tag = e.target.getAttribute('data-tag');
-                    const cursorPos = inputTemplate.selectionStart;
-                    const textBefore = inputTemplate.value.substring(0, cursorPos);
-                    const textAfter  = inputTemplate.value.substring(cursorPos, inputTemplate.value.length);
-                    
-                    inputTemplate.value = textBefore + tag + textAfter;
+                    inputTemplate.setRangeText(tag, inputTemplate.selectionStart, inputTemplate.selectionEnd, 'end');
                     inputTemplate.focus();
                     updatePreview();
-                });
+                };
             });
 
             function updatePreview() {
@@ -344,381 +278,334 @@
                 text = text.replace(/\[NAMA_GRUP\]/g, "Grup Kelas Informatika");
                 previewText.textContent = text || "Ketik template pesan Anda...";
             }
-
-            inputTemplate.addEventListener('input', updatePreview);
-            inputBulan.addEventListener('change', updatePreview);
+            inputTemplate.oninput = updatePreview;
+            inputBulan.onchange = updatePreview;
             updatePreview();
         }
 
-        // FUNGSI BARU: TARIK GRUP OTOMATIS DARI WHATSAPP
         async function fetchWhatsAppGroups() {
             const selectGrup = document.getElementById('select-group');
             selectGrup.innerHTML = '<option value="">-- Sedang Menarik Daftar Grup WhatsApp... --</option>';
-            selectGrup.disabled = true;
-            
             try {
                 const res = await fetch(`https://api.green-api.com/waInstance${CENTRAL_GREEN_API.idInstance}/getChats/${CENTRAL_GREEN_API.apiTokenInstance}`);
                 const chats = await res.json();
-
-                // Saring hanya obrolan yang berbentuk Grup (@g.us)
                 const groups = chats.filter(chat => chat.id.includes('@g.us'));
-                
                 selectGrup.innerHTML = '<option value="">-- Pilih Grup Tagihan Kas --</option>';
-                
                 if(groups.length === 0) {
-                    selectGrup.innerHTML = '<option value="">Tidak ada grup ditemukan di akun ini.</option>';
+                    selectGrup.innerHTML = '<option value="">Tidak ada grup ditemukan.</option>';
                     return;
                 }
-
-                // Masukkan data grup asli ke dalam Dropdown
                 groups.forEach(g => {
                     const option = document.createElement('option');
                     option.value = g.id;
-                    option.textContent = g.name || `Grup Tanpa Nama (${g.id.split('@')[0]})`;
+                    option.textContent = g.name || g.id;
                     selectGrup.appendChild(option);
                 });
-                
-                selectGrup.disabled = false;
             } catch (err) {
-                console.error("Gagal menarik grup:", err);
-                selectGrup.innerHTML = '<option value="">Gagal memuat grup. Pastikan instance aktif.</option>';
+                selectGrup.innerHTML = '<option value="">Gagal memuat list grup otomatis.</option>';
             }
         }
 
-        // FUNGSI BARU: CEK KONEKSI WHATSAPP ASLI (ANTI-DUMMY)
         async function cekKoneksiWhatsApp() {
             const statusContainer = document.getElementById('status-gateway-container');
-            
-            // Tampilan awal saat mendeteksi server
-            statusContainer.innerHTML = `
-                <span class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5 animate-pulse">
-                    <span class="w-1.5 h-1.5 bg-slate-400 rounded-full"></span> Memeriksa Jaringan Bot...
-                </span>
-            `;
-
+            statusContainer.innerHTML = `<span class="text-xs text-slate-400 animate-pulse">Memeriksa Jaringan Bot...</span>`;
             try {
                 const res = await fetch(`https://api.green-api.com/waInstance${CENTRAL_GREEN_API.idInstance}/getStateInstance/${CENTRAL_GREEN_API.apiTokenInstance}`);
                 const data = await res.json();
-                
                 if (data.stateInstance === "authorized") {
-                    // Jika nomor WA kamu aktif dan terhubung di server
-                    statusContainer.innerHTML = `
-                        <span class="text-[11px] bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Sistem Bot Siap Kirim
-                        </span>
-                    `;
-                    // Lanjutkan panggil fungsi tarik grup karena sistem aman
+                    statusContainer.innerHTML = `<span class="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded font-bold border border-emerald-200">🟢 Sistem Bot Siap</span>`;
                     fetchWhatsAppGroups();
                 } else {
-                    // Jika nomor WA terputus / keluar dari perangkat tertaut
-                    statusContainer.innerHTML = `
-                        <span class="text-[11px] bg-amber-100 text-amber-800 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5">
-                            <span class="w-1.5 h-1.5 bg-amber-500 rounded-full"></span> WA Developer Belum Scan QR
-                        </span>
-                    `;
-                    document.getElementById('select-group').innerHTML = '<option value="">-- WA Belum Terhubung, Hubungi Developer --</option>';
+                    statusContainer.innerHTML = `<span class="text-xs bg-amber-100 text-amber-800 px-2 py-1 rounded font-bold border border-amber-200">⚠️ WA Belum Terhubung</span>`;
                 }
             } catch (err) {
-                console.error(err);
-                statusContainer.innerHTML = `
-                    <span class="text-[11px] bg-rose-100 text-rose-800 px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1.5">
-                        <span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Koneksi Server Gagal
-                    </span>
-                `;
+                statusContainer.innerHTML = `<span class="text-xs bg-rose-100 text-rose-800 px-2 py-1 rounded font-bold border border-rose-200">🔴 Koneksi Server Gagal</span>`;
             }
         }
 
-        // FUNGSI BARU: LOAD DATA JADWAL BERDASARKAN BULAN 
         function loadDanEditJadwalBulan(bulan) {
-            const dataJadwalBulan = localSchedulesObject[bulan];
+            const data = localSchedulesObject[bulan];
             const jamSelect = document.getElementById('jam-eksekusi');
             const inputTemplate = document.getElementById('template-pesan');
-
-            if (dataJadwalBulan) {
-                jamSelect.value = dataJadwalBulan.jamEksekusi || "08:00";
-                inputTemplate.value = dataJadwalBulan.templatePesan || "";
-                
-                // Centang hari sesuai data database
-                const hariAktif = dataJadwalBulan.hariAktif || [];
-                document.querySelectorAll('.check-hari').forEach(cb => {
-                    cb.checked = hariAktif.includes(cb.value);
-                });
+            if (data) {
+                jamSelect.value = data.jamEksekusi || "08:00";
+                inputTemplate.value = data.templatePesan || "";
+                document.querySelectorAll('.check-hari').forEach(cb => cb.checked = (data.hariAktif || []).includes(cb.value));
             } else {
-                // Form kosong jika bulan tersebut belum pernah di-setup
                 jamSelect.value = "08:00";
                 document.querySelectorAll('.check-hari').forEach(cb => cb.checked = false);
                 inputTemplate.value = "Halo kawan-kawan [NAMA_GRUP]! 👋\n\nIni adalah pengingat otomatis untuk kas periode *[BULAN]*.\n\nMohon bagi yang belum melunasi agar segera transfer ke:\nBCA: 12345678 a.n Bendahara\n\nTerima kasih! 🙏";
             }
-            // Trigger update tampilan live preview
             inputTemplate.dispatchEvent(new Event('input'));
         }
 
-        // FUNGSI BARU: PROSES SIMPAN KE DATABASE (MULTI-BULAN)
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('btn-save').addEventListener('click', async () => {
-                if (!currentUser) return;
+        // AKSI SIMPAN PAYLOAD JADWAL SAAS
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            const user = auth.currentUser;
+            if (!user) return;
 
-                const bulanTerpilih = document.getElementById('bulan-target').value;
-                const jamTerpilih = document.getElementById('jam-eksekusi').value;
-                const teksTemplate = document.getElementById('template-pesan').value;
+            const bulanTerpilih = document.getElementById('bulan-target').value;
+            const jamTerpilih = document.getElementById('jam-eksekusi').value;
+            const teksTemplate = document.getElementById('template-pesan').value;
+            const hariTerpilih = [];
+            document.querySelectorAll('.check-hari:checked').forEach(cb => hariTerpilih.push(cb.value));
 
-                const hariTerpilih = [];
-                document.querySelectorAll('.check-hari:checked').forEach(cb => {
-                    hariTerpilih.push(cb.value);
-                });
+            localSchedulesObject[bulanTerpilih] = {
+                jamEksekusi: jamTerpilih,
+                statusPengaturan: "aktif",
+                hariAktif: hariTerpilih,
+                templatePesan: teksTemplate,
+                updatedAt: new Date().toISOString()
+            };
 
-                // 1. Amankan data baru / timpa data lama di objek lokal jadwal
-                localSchedulesObject[bulanTerpilih] = {
-                    jamEksekusi: jamTerpilih,
-                    statusPengaturan: "aktif",
-                    hariAktif: hariTerpilih,
-                    templatePesan: teksTemplate,
-                    updatedAt: new Date().toISOString()
-                };
-
-                // 2. SUSUN PAYLOAD DATA TERSTRUKTUR (DI SINI TEMPATNYA, BRO!)
-                const payloadData = {
-                        schedulesByMonth: localSchedulesObject,
-                        greenApiConfig: {
-                        // Mengambil dari input field dinamis di UI, bukan hardcode lagi!
-                        idInstance: document.getElementById('input-id-instance').value.trim(),
-                        apiTokenInstance: document.getElementById('input-token-instance').value.trim(),
-                        selectedGroups: selectedGroups 
-                    }
-                };
-
-                const btnSave = document.getElementById('btn-save');
-                btnSave.disabled = true;
-                btnSave.textContent = "Menyimpan ke Server...";
-
-                // 3. EKSEKUSI PENGIRIMAN KE FIRESTORE
-                try {
-                    // Simpan map multi-bulan & multi-grup ke Firestore
-                    await setDoc(doc(db, "users", currentUser.uid), payloadData, { merge: true });
-                    alert(`Jadwal & Target Grup untuk periode ${bulanTerpilih} berhasil diperbarui di server!`);
-                } catch (error) {
-                    console.error("Gagal menyimpan data:", error);
-                    alert("Gagal menyimpan data ke server database.");
-                } finally {
-                    btnSave.disabled = false;
-                    btnSave.textContent = "Simpan & Update Konfigurasi Server";
+            const payloadData = {
+                schedulesByMonth: localSchedulesObject,
+                greenApiConfig: {
+                    idInstance: document.getElementById('input-id-instance').value.trim(),
+                    apiTokenInstance: document.getElementById('input-token-instance').value.trim(),
+                    selectedGroups: selectedGroups 
                 }
-            });
+            };
+
+            const btnSave = document.getElementById('btn-save');
+            btnSave.disabled = true;
+            btnSave.textContent = "Menyimpan ke Cloud Firestore...";
+
+            try {
+                await setDoc(doc(db, "users", user.uid), payloadData, { merge: true });
+                alert(`Jadwal periode ${bulanTerpilih} berhasil di-update secara live!`);
+            } catch (error) {
+                alert("Gagal sinkronisasi data.");
+            } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = "Simpan & Update Konfigurasi Server";
+            }
+        });
+
+        // TAMBAHKAN LOGIKA INI DI SISI JAVASCRIPT:
+        document.getElementById('btn-cancel-setup-wa').addEventListener('click', () => {
+            // Panggil fungsi signOut bawaan Firebase Auth yang sudah kamu import di atas
+            signOut(auth).then(() => {
+                resetGlobalState(); // Bilas seluruh state RAM browser
+                location.reload();  // Segarkan halaman agar kembali bersih ke gerbang login depan
+            }).catch(console.error);
         });
     </script>
 </head>
 <body class="text-slate-800 h-screen flex flex-col overflow-hidden bg-slate-50">
 
-    <!-- SCREEN 0: GLOBAL LOADER -->
     <div id="loader-global" class="fixed inset-0 z-50 bg-white/90 flex flex-col items-center justify-center hidden backdrop-blur-sm">
         <div class="animate-spin rounded-full h-10 w-10 border-b-4 border-indigo-600 mb-3"></div>
         <p class="text-sm font-semibold text-slate-600 animate-pulse">Menghubungkan ke Server...</p>
     </div>
 
-    <!-- SCREEN 1: MENU LOGIN (SaaS LANDING) -->
-    <div id="screen-login" class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 transition-all">
-            <div class="text-center mb-8">
-                <div class="inline-flex items-center justify-center w-14 h-14 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/30 mb-4 animate-bounce">
-                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div id="screen-login" class="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+        <div class="hidden md:flex md:w-1/2 bg-gradient-to-br from-emerald-600 to-teal-800 p-12 items-center justify-center text-white relative">
+            <div class="max-w-md relative z-10">
+                <div class="w-14 h-14 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 shadow-lg border border-white/20">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <h1 class="text-2xl font-black text-slate-800 tracking-tight">KasBot Pro <span class="text-emerald-500 text-xs font-bold px-2 py-0.5 bg-emerald-50 rounded-full border border-emerald-200">v2.0</span></h1>
-                <p class="text-sm text-slate-500 mt-1">Sistem Pengingat Kas Otomatis Multi-Grup</p>
+                <h2 class="text-4xl font-black tracking-tight mb-4 leading-tight">Otomatisasi Kas Kelompok Tanpa Ribet.</h2>
+                <p class="text-emerald-100/90 text-sm leading-relaxed">KasBot Pro membantu Bendahara Umum menjadwalkan, memantau, dan mengirimkan notifikasi tagihan kas secara otomatis ke banyak grup WhatsApp sekaligus lewat integrasi cloud.</p>
             </div>
+        </div>
 
-            <div class="space-y-4 mb-6 text-left">
-                <div>
-                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">Kode Rahasia Akses</label>
-                    <input type="text" id="secret-code" placeholder="Masukkan kode undangan dev..." class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-semibold tracking-wide focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm">
+        <div class="w-full md:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-white">
+            <div class="w-full max-w-sm">
+                <div class="mb-8 md:hidden text-center">
+                    <div class="inline-flex items-center justify-center w-12 h-12 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/30 mb-4">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h1 class="text-2xl font-black text-slate-800 tracking-tight">KasBot Pro</h1>
+                    <p class="text-xs text-slate-500 mt-1">Sistem Pengingat Kas Otomatis Multi-Grup</p>
                 </div>
 
-                <div class="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4">
-                    <span class="text-xs font-bold uppercase tracking-wider text-indigo-600">Integrasi Gateway WhatsApp</span>
-                    
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-500 mb-1">ID Instance Green-API</label>
-                        <input type="text" id="input-id-instance" placeholder="Contoh: 110185XXXX" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm">
-                    </div>
+                <div class="hidden md:block mb-8">
+                    <h1 class="text-2xl font-black text-slate-800 tracking-tight">Access Gateway</h1>
+                    <p class="text-xs text-slate-500 mt-1">Gunakan kode undangan akses untuk mendaftarkan akun bendahara.</p>
+                </div>
 
+                <div class="space-y-4 mb-6">
                     <div>
-                        <label class="block text-[11px] font-medium text-slate-500 mb-1">API Token Instance</label>
-                        <input type="password" id="input-token-instance" placeholder="Masukkan token instance panjang..." class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm">
+                        <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Kode Rahasia Akses</label>
+                        <input type="text" id="secret-code" placeholder="Masukkan kode undangan..." class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold tracking-wide focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm transition">
                     </div>
                 </div>
-            </div>
 
-            <button id="btn-login" class="w-full inline-flex items-center justify-center gap-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all shadow-lg shadow-slate-900/20 cursor-pointer group">
-                <svg class="w-5 h-5 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.42 1.74l3.3-3.3A11.93 11.93 0 0 0 12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.95 0 10.87-4.8 10.87-10.87 0-.73-.07-1.43-.2-2.13H12V5.04z"/>
-                    <path fill="#4285F4" d="M22.67 11.13c0-.73-.07-1.43-.2-2.13H12v4.04h6.16a5.27 5.27 0 0 1-2.28 3.46v2.88h3.67c2.14-1.98 3.37-4.89 3.37-8.25z"/>
-                    <path fill="#FBBC05" d="M5.84 14.09a7.13 7.13 0 0 1 0-4.17V7.04H2.17a11.97 11.97 0 0 0 0 9.92l3.67-2.87z"/>
-                    <path fill="#34A853" d="M12 22c3.24 0 5.97-1.08 7.96-2.92l-3.67-2.88c-1.02.68-2.33 1.09-4.29 1.09-3.3 0-6.1-2.23-7.1-5.25H2.17v2.87A11.97 11.97 0 0 0 12 22z"/>
-                </svg>
-                <span>Verifikasi & Masuk via Google</span>
-            </button>
-            
-            <p class="text-[11px] text-slate-400 mt-5 text-center">Pastikan status instance Green-API Anda sudah **Authorized** sebelum login.</p>
+                <button id="btn-login" class="w-full inline-flex items-center justify-center gap-3 bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-sm px-6 py-3.5 rounded-xl transition-all shadow-lg cursor-pointer">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24">
+                        <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.42 1.74l3.3-3.3A11.93 11.93 0 0 0 12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c5.95 0 10.87-4.8 10.87-10.87 0-.73-.07-1.43-.2-2.13H12V5.04z"/>
+                        <path fill="#4285F4" d="M22.67 11.13c0-.73-.07-1.43-.2-2.13H12v4.04h6.16a5.27 5.27 0 0 1-2.28 3.46v2.88h3.67c2.14-1.98 3.37-4.89 3.37-8.25z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09a7.13 7.13 0 0 1 0-4.17V7.04H2.17a11.97 11.97 0 0 0 0 9.92l3.67-2.87z"/>
+                        <path fill="#34A853" d="M12 22c3.24 0 5.97-1.08 7.96-2.92l-3.67-2.88c-1.02.68-2.33 1.09-4.29 1.09-3.3 0-6.1-2.23-7.1-5.25H2.17v2.87A11.97 11.97 0 0 0 12 22z"/>
+                    </svg>
+                    <span>Verifikasi & Masuk</span>
+                </button>
+            </div>
         </div>
     </div>
 
-    <!-- SCREEN 2: GATEKEEPER (VERIFIKASI KODE AKSES) -->
-    <div id="screen-access-code" class="flex-1 flex flex-col items-center justify-center p-4 hidden relative z-10">
-        <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-100">
-            <div class="mx-auto w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mb-4">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
-            </div>
-            <h2 class="text-xl font-bold text-slate-900 mb-1">Akses Membutuhkan Undangan</h2>
-            <p class="text-xs text-slate-500 mb-6">Akun <span id="text-user-email-wait" class="font-bold text-slate-700">email</span> belum diverifikasi. Masukkan kode akses dari Developer untuk mengaktifkan akun.</p>
-            
-            <input type="text" id="input-access-code" placeholder="Masukkan Kode Rahasia" class="w-full border-2 border-slate-200 p-3.5 rounded-xl text-center font-mono font-bold tracking-widest text-slate-800 focus:border-emerald-500 focus:ring-0 outline-none mb-4 uppercase">
-            
-            <button id="btn-verify-code" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition">
-                Verifikasi Kode
-            </button>
-            <button class="mt-4 text-xs font-semibold text-rose-500 hover:text-rose-600" onclick="location.reload()">Batal & Kembali</button>
-        </div>
-    </div>
-
-    <!-- SCREEN 3: DASHBOARD PRO -->
-    <div id="screen-dashboard" class="flex-1 flex flex-col hidden h-full">
-        <!-- NAVBAR -->
-        <nav class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center shrink-0 shadow-md">
-            <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center font-bold">K</div>
-                <span class="font-bold tracking-wide">KasBot <span class="text-emerald-400">Pro</span></span>
-            </div>
-            <div class="flex items-center gap-4">
-                <div class="text-right hidden sm:block">
-                    <p class="text-xs font-bold" id="user-name">Nama Bendahara</p>
-                    <p class="text-[10px] text-slate-400" id="user-email">email@gmail.com</p>
-                </div>
-                <img id="user-avatar" src="" class="w-9 h-9 rounded-full ring-2 ring-slate-700">
-                <button id="btn-logout" class="text-xs bg-slate-800 hover:bg-rose-600 px-3 py-1.5 rounded-md transition duration-200">Keluar</button>
-            </div>
-        </nav>
-
-        <!-- SPLIT CONTENT -->
-        <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            <!-- KOLOM KIRI (FORM) -->
-            <div class="w-full lg:w-3/5 xl:w-2/3 p-6 overflow-y-auto bg-slate-50 pb-20">
-                <div class="max-w-3xl mx-auto space-y-6">
-                    
-                    <!-- 1. TARGET DISTRIBUSI (DROPDOWN + ADD BUTTON + CHIPS) -->
-                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                                <span class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">1</span> 
-                                Target Distribusi Grup
-                            </h3>
-                            <div id="status-gateway-container"></div>
-                        </div>
-                        
-                        <p class="text-xs text-slate-500 mb-3">Pilih dan tambahkan grup WhatsApp yang akan menerima blast otomatis.</p>
-                        
-                        <div class="flex gap-2 mb-4">
-                            <select id="select-group" class="flex-1 border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
-                                <option value="">-- Pilih Grup Tagihan Kas --</option>
-                            </select>
-                            <button id="btn-add-group" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 rounded-lg shadow-sm transition whitespace-nowrap">
-                                + Tambah
-                            </button>
-                        </div>
-
-                        <!-- Area Chips Grup Terpilih -->
-                        <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[80px]">
-                            <div id="selected-groups-chips" class="flex flex-wrap gap-2">
-                                <!-- Chips akan dirender lewat JS di sini -->
-                                <p class="text-xs text-slate-400 italic w-full text-center mt-2">Belum ada grup yang ditambahkan.</p>
-                            </div>
-                        </div>
-                        <div class="mt-2 text-[11px] text-slate-500 font-medium">Terpilih: <span id="count-selected" class="text-indigo-600 font-bold">0</span> grup.</div>
-                    </div>
-
-                    <!-- 2. SIKLUS PENJADWALAN DINAMIS -->
-                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                        <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <span class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">2</span> 
-                            Siklus & Waktu Penagihan
-                        </h3>
-                        
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <!-- PERIODE BULAN (SCRIPT DINAMIS) -->
-                            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Periode Tagihan</label>
-                                <select id="bulan-target" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm cursor-pointer">
-                                    <!-- Option akan diisi otomatis lewat JS (Generate 6 bulan ke depan) -->
-                                </select>
-                            </div>
-
-                            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Jam Eksekusi (WIB)</label>
-                                <select id="jam-eksekusi" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm cursor-pointer">
-                                    <option value="01:00">01:00 Subuh (Test Mode)</option> 
-                                    <option value="02:00">02:00 Subuh (Test Mode)</option>
-                                    <option value="08:00" selected>08:00 Pagi</option>
-                                    <option value="12:00">12:00 Siang</option>
-                                    <option value="20:00">20:00 Malam</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                            <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Hari Eksekusi Mingguan</label>
-                            <div class="flex flex-wrap gap-2">
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Senin"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Sen</span></label>
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Selasa"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Sel</span></label>
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Rabu"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Rab</span></label>
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Kamis"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Kam</span></label>
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Jumat"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Jum</span></label>
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Sabtu"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Sab</span></label>
-                                <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Minggu"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Min</span></label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. TEMPLATE PESAN -->
-                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                        <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                            <span class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">3</span> 
-                            Template Pesan Tagihan
-                        </h3>
-                        <div class="mb-3">
-                            <span class="text-[11px] text-slate-500 font-medium mr-2">Variabel:</span>
-                            <button class="var-btn text-[10px] font-mono bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-100 transition mr-1" data-tag="[BULAN]">[BULAN]</button>
-                            <button class="var-btn text-[10px] font-mono bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-100 transition" data-tag="[NAMA_GRUP]">[NAMA_GRUP]</button>
-                        </div>
-                        <textarea id="template-pesan" rows="6" class="w-full border border-slate-300 p-3.5 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-y shadow-inner"></textarea>
-                    </div>
-
-                    <button id="btn-save" class="w-full bg-slate-900 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-xl transition duration-200 flex justify-center items-center gap-2">
-                        Simpan & Update Konfigurasi Server
-                    </button>
-                </div>
-            </div>
-
-            <!-- KOLOM KANAN (PREVIEW) -->
-            <div class="w-full lg:w-2/5 xl:w-1/3 bg-slate-200 border-l border-slate-300 flex flex-col hidden lg:flex relative">
-                <div class="bg-[#075e54] text-white px-4 py-3 flex items-center gap-3 shrink-0 shadow-md z-10">
-                    <div class="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center overflow-hidden">
-                        <img src="https://ui-avatars.com/api/?name=WA&background=random" class="w-full h-full object-cover">
+    <div id="screen-dashboard" class="flex-1 flex flex-col hidden h-full relative">
+        
+        <div id="setup-wa-gateway-form" class="hidden absolute inset-0 z-40 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4">
+            <div class="bg-white border border-slate-200 p-8 rounded-2xl max-w-sm w-full shadow-2xl text-center">
+                <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">⚠️</div>
+                <h3 class="text-lg font-bold text-slate-800 mb-2">Integrasi Gateway Diperlukan</h3>
+                <p class="text-xs text-slate-500 mb-6 leading-relaxed">Akun baru dideteksi. Mohon sambungkan <b>ID Instance</b> dan <b>API Token</b> dari Green-API untuk mengaktifkan fitur pencarian grup.</p>
+                <div class="space-y-4 mb-6 text-left">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ID Instance</label>
+                        <input type="text" id="setup-id-instance" placeholder="Contoh: 710384..." class="w-full border border-slate-300 px-4 py-3 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-500 transition">
                     </div>
                     <div>
-                        <h4 class="font-semibold text-sm">Preview Pesan</h4>
-                        <p class="text-[10px] text-slate-200">Disimulasikan untuk <span id="preview-grup-nama">Grup Terpilih</span></p>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">API Token Instance</label>
+                        <input type="password" id="setup-token-instance" placeholder="Masukkan token panjang..." class="w-full border border-slate-300 px-4 py-3 rounded-xl text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-500 transition">
                     </div>
                 </div>
+                <button id="btn-save-setup-wa" class="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-sm py-3.5 rounded-xl transition shadow-md">Simpan & Aktifkan Akun</button>
+                <button id="btn-cancel-setup-wa" type="button" class="w-full bg-transparent hover:bg-slate-100 text-rose-500 hover:text-rose-600 font-semibold text-xs py-2 rounded-xl transition cursor-pointer block text-center">
+                    ❌ Batal & Keluar Akun
+                </button>
+            </div>
+        </div>
+
+        <div id="main-dashboard-content" class="hidden flex-1 flex flex-col h-full">
+            
+            <nav class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center shrink-0 shadow-md">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center font-bold text-slate-900 shadow-sm">K</div>
+                    <span class="font-bold tracking-wide">KasBot <span class="text-emerald-400">Pro</span></span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right hidden sm:block">
+                        <p class="text-xs font-bold" id="user-name">Nama Bendahara</p>
+                        <p class="text-[10px] text-slate-400" id="user-email">email@gmail.com</p>
+                    </div>
+                    <img id="user-avatar" src="" class="w-9 h-9 rounded-full ring-2 ring-slate-700">
+                    <button id="btn-logout" class="text-xs bg-slate-800 hover:bg-rose-600 px-3 py-1.5 rounded-md transition duration-200">Keluar</button>
+                </div>
+            </nav>
+
+            <div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 
-                <div class="flex-1 wa-bg p-4 overflow-y-auto flex flex-col justify-end">
-                    <div class="flex justify-center mb-4">
-                        <span id="preview-badge" class="bg-[#e1f3fb] text-slate-600 text-[11px] px-3 py-1 rounded-lg shadow-sm font-medium">Simulasi Jam Eksekusi</span>
+                <div class="w-full lg:w-3/5 xl:w-2/3 p-6 overflow-y-auto bg-slate-50 pb-20">
+                    
+                    <div class="hidden">
+                        <input type="text" id="input-id-instance">
+                        <input type="text" id="input-token-instance">
+                    </div>
+
+                    <div class="max-w-3xl mx-auto space-y-6">
+                        
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <span class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">1</span> 
+                                    Target Distribusi Grup
+                                </h3>
+                                <div id="status-gateway-container"></div>
+                            </div>
+                            
+                            <p class="text-xs text-slate-500 mb-3">Pilih dan tambahkan grup WhatsApp yang akan menerima blast otomatis.</p>
+                            
+                            <div class="flex flex-col sm:flex-row gap-2 mb-4">
+                                <select id="select-group" class="flex-1 border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-emerald-500 outline-none truncate">
+                                    <option value="">-- Pilih Grup Tagihan Kas --</option>
+                                </select>
+                                <button id="btn-add-group" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg shadow-sm transition whitespace-nowrap">
+                                    + Tambah
+                                </button>
+                            </div>
+
+                            <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg min-h-[80px]">
+                                <div id="selected-groups-chips" class="flex flex-wrap gap-2">
+                                    </div>
+                            </div>
+                            <div class="mt-2 text-[11px] text-slate-500 font-medium">Terpilih: <span id="count-selected" class="text-indigo-600 font-bold">0</span> grup.</div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">2</span> 
+                                Siklus & Waktu Penagihan
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Periode Tagihan</label>
+                                    <select id="bulan-target" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm cursor-pointer"></select>
+                                </div>
+
+                                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Jam Eksekusi (WIB)</label>
+                                    <select id="jam-eksekusi" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm cursor-pointer">
+                                        <option value="01:00">01:00 Subuh (Test Mode)</option> 
+                                        <option value="02:00">02:00 Subuh (Test Mode)</option>
+                                        <option value="08:00" selected>08:00 Pagi</option>
+                                        <option value="12:00">12:00 Siang</option>
+                                        <option value="20:00">20:00 Malam</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
+                                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Hari Eksekusi Mingguan</label>
+                                <div class="flex flex-wrap gap-2">
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Senin"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Sen</span></label>
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Selasa"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Sel</span></label>
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Rabu"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Rab</span></label>
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Kamis"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Kam</span></label>
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Jumat"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Jum</span></label>
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Sabtu"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Sab</span></label>
+                                    <label class="cursor-pointer"><input type="checkbox" class="peer sr-only check-hari" value="Minggu"><span class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-slate-200 peer-checked:bg-emerald-500 peer-checked:text-white transition shadow-sm">Min</span></label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                <span class="w-6 h-6 rounded bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">3</span> 
+                                Template Pesan Tagihan
+                            </h3>
+                            <div class="mb-3">
+                                <span class="text-[11px] text-slate-500 font-medium mr-2">Variabel:</span>
+                                <button class="var-btn text-[10px] font-mono bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-100 transition mr-1" data-tag="[BULAN]">[BULAN]</button>
+                                <button class="var-btn text-[10px] font-mono bg-indigo-50 text-indigo-600 border border-indigo-200 px-2 py-1 rounded hover:bg-indigo-100 transition" data-tag="[NAMA_GRUP]">[NAMA_GRUP]</button>
+                            </div>
+                            <textarea id="template-pesan" rows="6" class="w-full border border-slate-300 p-3.5 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none resize-y shadow-inner"></textarea>
+                        </div>
+
+                        <button id="btn-save" class="w-full bg-slate-900 hover:bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-xl transition duration-200 flex justify-center items-center gap-2">
+                            Simpan & Update Konfigurasi Server
+                        </button>
+                    </div>
+                </div>
+
+                <div class="w-full lg:w-2/5 xl:w-1/3 bg-slate-200 border-l border-slate-300 flex flex-col hidden lg:flex relative">
+                    <div class="bg-[#075e54] text-white px-4 py-3 flex items-center gap-3 shrink-0 shadow-md z-10">
+                        <div class="w-10 h-10 bg-slate-300 rounded-full flex items-center justify-center overflow-hidden">
+                            <img src="https://ui-avatars.com/api/?name=WA&background=random" class="w-full h-full object-cover">
+                        </div>
+                        <div>
+                            <h4 class="font-semibold text-sm">Preview Pesan</h4>
+                            <p class="text-[10px] text-slate-200">Disimulasikan untuk <span id="preview-grup-nama">Grup Terpilih</span></p>
+                        </div>
                     </div>
                     
-                    <div class="wa-bubble p-2.5 max-w-[90%] text-sm text-slate-800 relative self-start mb-2">
-                        <svg viewBox="0 0 8 13" width="8" height="13" class="absolute -left-[8px] top-0 text-[#dcf8c6]"><path fill="currentColor" d="M5.188 0H0v11.193l6.467-8.625C7.526 1.156 6.958 0 5.188 0z"></path></svg>
-                        <div id="preview-text" class="whitespace-pre-wrap font-sans leading-relaxed"></div>
-                        <div class="text-right mt-1"><span class="text-[10px] text-slate-500 font-semibold">08:00</span></div>
+                    <div class="flex-1 wa-bg p-4 overflow-y-auto flex flex-col justify-end">
+                        <div class="flex justify-center mb-4">
+                            <span id="preview-badge" class="bg-[#e1f3fb] text-slate-600 text-[11px] px-3 py-1 rounded-lg shadow-sm font-medium">Simulasi Jam Eksekusi</span>
+                        </div>
+                        
+                        <div class="wa-bubble p-2.5 max-w-[90%] text-sm text-slate-800 relative self-start mb-2">
+                            <svg viewBox="0 0 8 13" width="8" height="13" class="absolute -left-[8px] top-0 text-[#dcf8c6]"><path fill="currentColor" d="M5.188 0H0v11.193l6.467-8.625C7.526 1.156 6.958 0 5.188 0z"></path></svg>
+                            <div id="preview-text" class="whitespace-pre-wrap font-sans leading-relaxed"></div>
+                            <div class="text-right mt-1"><span class="text-[10px] text-slate-500 font-semibold">08:00</span></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -726,13 +613,32 @@
     </div>
 
     <script>
+        // PENDAFTARAN PWA DENGAN UX DETEKSI UPDATE OTOMATIS
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./service-worker.js')
-                    .then(reg => console.log('PWA Service Worker Terdaftar Sempurna!', reg))
+                    .then(reg => {
+                        console.log('PWA Service Worker Aktif!', reg);
+
+                        // Cek jika ada update di server saat user membuka web
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                // Jika proses install selesai dan ada service worker lama yang digantikan
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // UX Pop-up Elegan untuk User
+                                    if (confirm("🚀 Versi baru KasBot Pro tersedia! Perbarui sekarang untuk menikmati fitur terbaru?")) {
+                                        // Kirim sinyal skipWaiting ke service worker baru
+                                        newWorker.postMessage({ action: 'skipWaiting' });
+                                        window.location.reload();
+                                    }
+                                }
+                            });
+                        });
+                    })
                     .catch(err => console.error('Gagal mendaftarkan PWA:', err));
             });
         }
     </script>
-    </body>
+</body>
 </html>

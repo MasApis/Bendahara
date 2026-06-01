@@ -21,3 +21,10 @@ self.addEventListener('fetch', (e) => {
     })
   );
 });
+
+// Memaksa SW baru langsung aktif saat menerima instruksi dari UI frontend
+self.addEventListener('message', (event) => {
+  if (event.data.action === 'skipWaiting') {
+    self.skipWaiting();
+  }
+});

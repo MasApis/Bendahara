@@ -4,14 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard Bot Pengingat Kas</title>
-    <!-- Tailwind CSS untuk UI yang cepat & rapi -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <!-- Firebase App dan SDK yang dibutuhkan (v9+ kompatibel via CDN) -->
     <script type="module">
-         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-        // Konfigurasi Firebase Anda
+        // KONFIGURASI FIREBASE ASLI KAMU
         const firebaseConfig = {
             apiKey: "AIzaSyCIg-Cz0Up6wsxnkwknENR_durvd82MukA",
             authDomain: "bendahara-bcf09.firebaseapp.com",
@@ -23,10 +22,8 @@
         };
 
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
-
-        // Menyelaraskan target ID dokumen user sesuai arsitektur SaaS baru
-        const currentUserId = "ORG_123"; 
         const provider = new GoogleAuthProvider();
 
         // DOM Elements
@@ -34,187 +31,215 @@
         const dashboardSection = document.getElementById('dashboard-section');
         const btnLogin = document.getElementById('btn-login');
         const btnLogout = document.getElementById('btn-logout');
+        const btnSave = document.getElementById('btn-save');
         
-        // User Profile DOM
         const userAvatar = document.getElementById('user-avatar');
         const userName = document.getElementById('user-name');
         const userEmail = document.getElementById('user-email');
 
-        // Data WA Group DOM
-        const txtTargetGroup = document.getElementById('target-group');
-        const txtStatusJadwal = document.getElementById('status-jadwal');
-        const txtHariAktif = document.getElementById('hari-aktif');
-        const txtBulanTarget = document.getElementById('bulan-target');
-        const loadingData = document.getElementById('loading-data');
-        const infoData = document.getElementById('info-data');
+        // Form Inputs DOM
+        const inputIdInstance = document.getElementById('id-instance');
+        const inputApiToken = document.getElementById('api-token');
+        const inputNomorTujuan = document.getElementById('nomor-tujuan');
+        const inputBulanTarget = document.getElementById('bulan-target');
+        const inputHeaderPesan = document.getElementById('header-pesan');
+        const inputFooterPesan = document.getElementById('footer-pesan');
+        const selectStatus = document.getElementById('status-pengaturan');
 
-        /**
-         * 1. PROSES LOGIN (Google Sign-In)
-         */
-        btnLogin.addEventListener('click', async () => {
-            try {
-                await signInWithPopup(auth, provider);
-            } catch (error) {
-                console.error("Gagal Login:", error.message);
-                alert("Gagal masuk dengan Google. Silakan coba lagi.");
-            }
-        });
+        let currentUid = null;
 
-        /**
-         * 2. PROSES LOGOUT
-         */
-        btnLogout.addEventListener('click', async () => {
-            try {
-                await signOut(auth);
-            } catch (error) {
-                console.error("Gagal Logout:", error.message);
-            }
-        });
+        // Login & Logout Event
+        btnLogin.addEventListener('click', () => signInWithPopup(auth, provider).catch(console.error));
+        btnLogout.addEventListener('click', () => signOut(auth).catch(console.error));
 
-        /**
-         * 3. MONITOR STATUS AUTENTIKASI (Real-time)
-         */
+        // Monitor Status Auth
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // Jika user berhasil masuk
+                currentUid = user.uid;
                 loginSection.classList.add('hidden');
                 dashboardSection.classList.remove('hidden');
                 
-                // Set data profil bendahara
                 userAvatar.src = user.photoURL || 'https://via.placeholder.com/150';
                 userName.textContent = user.displayName;
                 userEmail.textContent = user.email;
 
-                // Ambil data konfigurasi grup WA dari Firestore milik user ini
                 fetchUserConfig(user.uid);
             } else {
-                // Jika user keluar / belum login
+                currentUid = null;
                 loginSection.classList.remove('hidden');
                 dashboardSection.classList.add('hidden');
             }
         });
 
-        /**
-         * 4. AMBIL DATA GRUP TARGET DARI FIRESTORE
-         */
+        // Ambil Data dari Firestore dan Masukkan ke Form
         async function fetchUserConfig(uid) {
-            loadingData.classList.remove('hidden');
-            infoData.classList.add('hidden');
-
             try {
-                // Mengambil dokumen berdasarkan UID user yang login
                 const docRef = doc(db, "users", uid);
-                const docSnap = await docRef.get();
+                const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     
-                    // Render data Green API & Config Jadwal
-                    const groupID = data.greenApiConfig?.nomorTujuan || "Belum diatur";
-                    txtTargetGroup.textContent = groupID;
+                    // Isi form dengan data yang sudah ada di DB
+                    inputIdInstance.value = data.greenApiConfig?.idInstance || "";
+                    inputApiToken.value = data.greenApiConfig?.apiTokenInstance || "";
+                    inputNomorTujuan.value = data.greenApiConfig?.nomorTujuan || "";
                     
-                    const status = data.configJadwal?.statusPengaturan || "tidak aktif";
-                    txtStatusJadwal.textContent = status.toUpperCase();
-                    txtStatusJadwal.className = status === 'aktif' 
-                        ? "px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800 w-fit"
-                        : "px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-800 w-fit";
+                    inputBulanTarget.value = data.configJadwal?.bulanTarget || "";
+                    inputHeaderPesan.value = data.configJadwal?.headerPesan || "";
+                    inputFooterPesan.value = data.configJadwal?.footerPesan || "";
+                    selectStatus.value = data.configJadwal?.statusPengaturan || "aktif";
 
-                    const hari = data.configJadwal?.hariAktif ? data.configJadwal.hariAktif.join(', ') : '-';
-                    txtHariAktif.textContent = hari;
-
-                    const bulan = data.configJadwal?.bulanTarget || "-";
-                    txtBulanTarget.textContent = bulan;
-
-                } else {
-                    // Jika user baru daftar dan dokumennya belum ada di Firestore
-                    txtTargetGroup.textContent = "Data baru! Hubungi Admin untuk mendaftarkan ID Grup WA Anda.";
-                    txtStatusJadwal.textContent = "BELUM DISET";
-                    txtHariAktif.textContent = "-";
-                    txtBulanTarget.textContent = "-";
+                    // Centang checkbox hari sesuai data DB
+                    const hariAktif = data.configJadwal?.hariAktif || [];
+                    document.querySelectorAll('.check-hari').forEach(cb => {
+                        cb.checked = hariAktif.includes(cb.value);
+                    });
                 }
             } catch (error) {
-                console.error("Gagal memuat data Firestore:", error);
-            } finally {
-                loadingData.classList.add('hidden');
-                infoData.classList.remove('hidden');
+                console.error("Gagal memuat data:", error);
             }
         }
+
+        // Simpan / Update Data Baru Mandiri ke Firestore
+        btnSave.addEventListener('click', async () => {
+            if (!currentUid) return;
+
+            // Ambil semua hari yang dicentang
+            const hariTerpilih = [];
+            document.querySelectorAll('.check-hari:checked').forEach(cb => {
+                hariTerpilih.push(cb.value);
+            });
+
+            // Susun payload terstruktur sesuai standarisasi Backend Cron kita
+            const userPayload = {
+                greenApiConfig: {
+                    idInstance: inputIdInstance.value.trim(),
+                    apiTokenInstance: inputApiToken.value.trim(),
+                    nomorTujuan: inputNomorTujuan.value.trim()
+                },
+                configJadwal: {
+                    statusPengaturan: selectStatus.value,
+                    bulanTarget: inputBulanTarget.value.trim(),
+                    hariAktif: hariTerpilih,
+                    headerPesan: inputHeaderPesan.value.trim(),
+                    footerPesan: inputFooterPesan.value.trim()
+                }
+            };
+
+            btnSave.disabled = true;
+            btnSave.textContent = "Menyimpan...";
+
+            try {
+                // Menggunakan setDoc dengan { merge: true } agar aman tidak menimpa field luar jika ada
+                await setDoc(doc(db, "users", currentUid), userPayload, { merge: true });
+                alert("Konfigurasi bot berhasil disimpan! Bot siap berjalan otomatis.");
+            } catch (error) {
+                console.error("Gagal menyimpan data:", error);
+                alert("Gagal menyimpan ke database. Cek aturan Firestore Rules Anda.");
+            } finally {
+                btnSave.disabled = false;
+                btnSave.textContent = "Simpan & Aktifkan Bot";
+            }
+        });
     </script>
 </head>
-<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col justify-center items-center p-4">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen p-4 flex flex-col items-center justify-center">
 
-    <!-- ================= SECTION 1: HALAMAN LOGIN ================= -->
-    <div id="login-section" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
-        <h2 class="text-2xl font-bold text-gray-900 mb-2">Bot Pengingat Kas</h2>
-        <p class="text-sm text-gray-500 mb-6">Khusus Bendahara Kelas / Organisasi. Masuk untuk mengelola jadwal pengiriman pesan otomatis.</p>
-        
-        <button id="btn-login" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-xl shadow-sm transition duration-150 cursor-pointer">
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" class="w-5 h-5">
+    <div id="login-section" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center border border-slate-100">
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">Bot Pengingat Kas</h2>
+        <p class="text-sm text-slate-500 mb-6">Masuk untuk mengonfigurasi gateway WhatsApp dan jadwal pengingat kas otomatis.</p>
+        <button id="btn-login" class="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold py-3 px-4 rounded-xl shadow-sm transition cursor-pointer">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" class="w-5 h-5">
             Masuk dengan Google
         </button>
     </div>
 
-    <!-- ================= SECTION 2: DASHBOARD UTAMA ================= -->
-    <div id="dashboard-section" class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-6 border border-gray-100 hidden">
+    <div id="dashboard-section" class="w-full max-w-3xl bg-white rounded-2xl shadow-xl p-6 border border-slate-100 hidden my-8">
         
-        <!-- Header Dashboard: Info Bendahara & Tombol Keluar -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-6 mb-6">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-4 mb-6">
             <div class="flex items-center gap-4">
-                <img id="user-avatar" src="" alt="Avatar" class="w-12 h-12 rounded-full ring-2 ring-gray-100">
+                <img id="user-avatar" src="" alt="Avatar" class="w-12 h-12 rounded-full ring-2 ring-slate-100">
                 <div>
-                    <h1 id="userName" class="text-lg font-bold text-gray-900">Selamat Datang, <span id="user-name">Bendahara</span>! 👋</h1>
-                    <p id="user-email" class="text-xs text-gray-500">email@gmail.com</p>
+                    <h1 class="text-lg font-bold text-slate-900">Halo, <span id="user-name">Bendahara</span>! 👋</h1>
+                    <p id="user-email" class="text-xs text-slate-500">email@gmail.com</p>
                 </div>
             </div>
-            <button id="btn-logout" class="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg transition cursor-pointer">
-                Keluar Aplikasi
-            </button>
+            <button id="btn-logout" class="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg transition cursor-pointer">Keluar</button>
         </div>
 
-        <!-- Konten Utama: Status Bot & Target Group -->
-        <div>
-            <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Status & Target Monitor</h3>
+        <div class="space-y-6">
             
-            <!-- State Loading Data -->
-            <div id="loading-data" class="text-center py-6 text-sm text-gray-400">
-                Memuat data grup WhatsApp dari server...
+            <div>
+                <h3 class="text-sm font-bold uppercase tracking-wider text-blue-600 mb-3">1. Integrasi Gateway WhatsApp (Green-API)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">ID Instance</label>
+                        <input type="text" id="id-instance" placeholder="Contoh: 110198xxxx" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">API Token Instance</label>
+                        <input type="password" id="api-token" placeholder="Masukkan token api instance" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-blue-500">
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">ID / Nomor Grup WhatsApp Tujuan</label>
+                    <input type="text" id="nomor-tujuan" placeholder="Contoh nomor: 628xxx atau grup: 120363367675503061@g.us" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm font-mono bg-slate-50 focus:bg-white focus:outline-blue-500">
+                    <span class="text-[11px] text-slate-400 mt-1 block">*Jika grup WA, pastikan menyertakan akhiran @g.us dengan benar.</span>
+                </div>
             </div>
 
-            <!-- Detail Grup Tujuan -->
-            <div id="info-data" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+            <hr class="border-slate-100">
+
+            <div>
+                <h3 class="text-sm font-bold uppercase tracking-wider text-green-600 mb-3">2. Pengaturan Jadwal & Template Pesan</h3>
                 
-                <!-- Card ID Grup Terhubung -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col justify-between">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                        <span class="text-xs font-medium text-gray-400 block mb-1">Grup WhatsApp Target</span>
-                        <p id="target-group" class="text-sm font-mono font-bold text-gray-800 break-all">Memuat...</p>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Target Bulan Kerja</label>
+                        <input type="text" id="bulan-target" placeholder="Contoh: Juni 2026" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-blue-500">
                     </div>
-                    <div class="mt-4">
-                        <span class="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">Green-API Connected</span>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Status Aktivasi Sistem</label>
+                        <select id="status-pengaturan" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-blue-500">
+                            <option value="aktif">AKTIF (Kirim Pesan Otomatis)</option>
+                            <option value="tidak aktif">MATI (Nonaktifkan Sementara)</option>
+                        </select>
                     </div>
                 </div>
 
-                <!-- Card Detail Aturan Cron -->
-                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
-                    <div>
-                        <span class="text-xs font-medium text-gray-400 block mb-0.5">Status Pengingat</span>
-                        <div id="txt-status-container">
-                            <span id="status-jadwal" class="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-600">CHECKING...</span>
-                        </div>
-                    </div>
-                    <div>
-                        <span class="text-xs font-medium text-gray-400 block mb-0.5">Hari Pengiriman</span>
-                        <p id="hari-aktif" class="text-sm font-semibold text-gray-700">-</p>
-                    </div>
-                    <div>
-                        <span class="text-xs font-medium text-gray-400 block mb-0.5">Target Bulan Ini</span>
-                        <p id="bulan-target" class="text-sm font-semibold text-gray-700">-</p>
+                <div class="mb-4">
+                    <label class="block text-xs font-semibold text-slate-600 mb-2">Hari Pengiriman (Bisa pilih lebih dari satu)</label>
+                    <div class="flex flex-wrap gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Senin" class="check-hari accent-green-600"> Senin</label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Selasa" class="check-hari accent-green-600"> Selasa</label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Rabu" class="check-hari accent-green-600"> Rabu</label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Kamis" class="check-hari accent-green-600"> Kamis</label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Jumat" class="check-hari accent-green-600"> Jumat</label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Sabtu" class="check-hari accent-green-600"> Sabtu</label>
+                        <label class="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" value="Minggu" class="check-hari accent-green-600"> Minggu</label>
                     </div>
                 </div>
 
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Header Pesan (Pembuka)</label>
+                        <textarea id="header-pesan" rows="4" placeholder="Contoh: [PENGINGAT KAS RUTIN] Halo teman-teman, jangan lupa bayar kas ya." class="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-blue-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Footer Pesan (Penutup)</label>
+                        <textarea id="footer-pesan" rows="4" placeholder="Contoh: Pembayaran bisa via Transfer/E-Wallet. Terima kasih! - Bendahara" class="w-full border border-slate-200 p-2.5 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-blue-500"></textarea>
+                    </div>
+                </div>
             </div>
-        </div>
 
+            <div class="pt-2">
+                <button id="btn-save" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition duration-150 cursor-pointer text-sm">
+                    Simpan & Aktifkan Bot
+                </button>
+            </div>
+
+        </div>
     </div>
 
 </body>

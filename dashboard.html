@@ -1,162 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Bendahara - KasReminder SaaS</title>
+    <title>Dashboard Bot Pengingat Kas</title>
+    <!-- Tailwind CSS untuk UI yang cepat & rapi -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="bg-gray-50 font-sans antialiased text-gray-800">
-
-    <nav class="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-        <div class="flex items-center space-x-2">
-            <span class="text-2xl">📢</span>
-            <h1 class="text-xl font-bold tracking-tight text-indigo-600">KasReminder</h1>
-        </div>
-        <div class="max-w-7xl mx-auto px-6 mt-6">
-            <div class="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
-                <div class="flex items-center space-x-3">
-                    <span id="badgeStatusJadwal" class="text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-800">Status: Memuat...</span>
-                    <p id="labelBulanLanding" class="text-sm text-gray-500 font-medium">Periode Kas: ...</p>
-                </div>
-                <p class="text-xs text-gray-400 hidden md:block">Waktu Server tersinkronisasi Asia/Jakarta</p>
-            </div>
-        </div>
-        <div class="flex items-center space-x-4">
-            <span id="user-email" class="text-sm text-gray-600 font-medium">bendahara@hmti.org</span>
-            <button class="text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-semibold transition">
-                Keluar
-            </button>
-        </div>
-    </nav>
-
-    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <section class="lg:col-span-1 space-y-6">
-            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Profil Organisasi</h2>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nama Organisasi / Grup</label>
-                    <input type="text" id="org-name" value="HMTI UMRAH" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Jadwal Pengingat Otomatis</h2>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Hari Aktif</label>
-                        <!-- Grid Checkbox Multi-Hari -->
-                        <div id="hari-aktif-container" class="grid grid-cols-2 gap-2 text-sm">
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                                <input type="checkbox" name="hariAktif" value="Senin" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Senin</span>
-                            </label>
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                                <input type="checkbox" name="hariAktif" value="Selasa" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Selasa</span>
-                            </label>
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                                <input type="checkbox" name="hariAktif" value="Rabu" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Rabu</span>
-                            </label>
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                                <input type="checkbox" name="hariAktif" value="Kamis" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Kamis</span>
-                            </label>
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                                <input type="checkbox" name="hariAktif" value="Jumat" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Jumat</span>
-                            </label>
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition">
-                                <input type="checkbox" name="hariAktif" value="Sabtu" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Sabtu</span>
-                            </label>
-                            <label class="flex items-center space-x-2 border border-gray-200 p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition col-span-2">
-                                <input type="checkbox" name="hariAktif" value="Minggu" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                                <span>Minggu</span>
-                            </label>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Status Bot</label>
-                        <div class="flex items-center space-x-2">
-                            <input type="checkbox" id="bot-status" checked class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
-                            <label for="bot-status" class="text-sm text-gray-600">Aktifkan Pengingat Otomatis</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Template Broadcast</h2>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Isi Pesan WhatsApp</label>
-                    <textarea id="msg-template" rows="5" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">📢 HALO WARGA ORGANISASI!
-
-Mau ngingetin aja nih, jadwal bayar uang kas kita sudah tiba ya. Yuk disegerakan biar program kerja kita jalan lancar! Terima kasih banyak~ ✨</textarea>
-                    <p class="text-xs text-gray-400 mt-2">Pesan ini akan otomatis dikirim ke grup sesuai jadwal.</p>
-                </div>
-                
-                <button id="btn-save-config" class="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition shadow-sm">
-                    Simpan Konfigurasi
-                </button>
-            </div>
-        </section>
-
-        <section class="lg:col-span-2 space-y-6">
-            <div class="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h3 class="font-bold text-indigo-900">Tautkan Anggota Baru</h3>
-                    <p class="text-sm text-indigo-700">Bagikan link ini ke grup agar anggota bisa mengisi nama & nomor WA mereka sendiri.</p>
-                </div>
-                <div class="flex w-full md:w-auto gap-2">
-                    <input type="text" id="invite-link" readonly value="https://kasreminder.web.app/join?org=ORG_123" class="bg-white px-3 py-1.5 border border-indigo-200 rounded-lg text-sm text-gray-600 focus:outline-none w-full md:w-64">
-                    <button onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value)" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium transition whitespace-nowrap">
-                        Salin Link
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div class="p-6 border-b border-gray-100 flex justify-between items-center">
-                    <h2 class="font-bold text-lg text-gray-900">Daftar Anggota Terdaftar</h2>
-                    <span id="member-count" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2.5 py-1 rounded-full">3 Anggota</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 text-xs font-semibold uppercase tracking-wider text-gray-500 border-b border-gray-100">
-                                <th class="px-6 py-3">Nama Anggota</th>
-                                <th class="px-6 py-3">Nomor WhatsApp</th>
-                                <th class="px-6 py-3 text-right">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="member-table-body" class="divide-y divide-gray-100 text-sm">
-                            <tr>
-                                <td class="px-6 py-4 font-medium text-gray-900">Fachrezi Bachri</td>
-                                <td class="px-6 py-4 text-gray-600">628123456789</td>
-                                <td class="px-6 py-4 text-right">
-                                    <button class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="px-6 py-4 font-medium text-gray-900">Juan dkk</td>
-                                <td class="px-6 py-4 text-gray-600">628987654321</td>
-                                <td class="px-6 py-4 text-right">
-                                    <button class="text-red-600 hover:text-red-800 font-medium">Hapus</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-    </main>
-
+    <!-- Firebase App dan SDK yang dibutuhkan (v9+ kompatibel via CDN) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
         import { getFirestore, doc, setDoc, collection, onSnapshot, query, deleteDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
 
         // Konfigurasi Firebase Anda
@@ -175,195 +27,195 @@ Mau ngingetin aja nih, jadwal bayar uang kas kita sudah tiba ya. Yuk disegerakan
 
         // Menyelaraskan target ID dokumen user sesuai arsitektur SaaS baru
         const currentUserId = "ORG_123"; 
+        const provider = new GoogleAuthProvider();
 
-        // DOM Elements Eksisting
-        const orgNameInput = document.getElementById('org-name');
-        const botStatusCheckbox = document.getElementById('bot-status');
-        const msgTemplateTextarea = document.getElementById('msg-template');
-        const btnSave = document.getElementById('btn-save-config');
-        const inviteLinkInput = document.getElementById('invite-link');
-        const memberTableBody = document.getElementById('member-table-body');
-        const memberCountSpan = document.getElementById('member-count');
+        // DOM Elements
+        const loginSection = document.getElementById('login-section');
+        const dashboardSection = document.getElementById('dashboard-section');
+        const btnLogin = document.getElementById('btn-login');
+        const btnLogout = document.getElementById('btn-logout');
+        
+        // User Profile DOM
+        const userAvatar = document.getElementById('user-avatar');
+        const userName = document.getElementById('user-name');
+        const userEmail = document.getElementById('user-email');
 
-        // DOM Elements Tambahan untuk Detektor Awal Bulan (Fase UI Landing)
-        const labelBulanLanding = document.getElementById("labelBulanLanding");
-        const badgeStatusJadwal = document.getElementById("badgeStatusJadwal");
-        const btnActionWizard = document.getElementById("btnActionWizard");
+        // Data WA Group DOM
+        const txtTargetGroup = document.getElementById('target-group');
+        const txtStatusJadwal = document.getElementById('status-jadwal');
+        const txtHariAktif = document.getElementById('hari-aktif');
+        const txtBulanTarget = document.getElementById('bulan-target');
+        const loadingData = document.getElementById('loading-data');
+        const infoData = document.getElementById('info-data');
 
-        inviteLinkInput.value = `${window.location.origin}/join.html?org=${currentUserId}`;
-
-        // Helper mendapatkan string "Bulan Tahun" komputer lokal saat ini
-        function dapatkanBulanTahunSekarang() {
-            const opsiBulanTahun = { month: 'long', year: 'numeric' };
-            return new Intl.DateTimeFormat('id-ID', opsiBulanTahun).format(new Date());
-        }
-
-        // ==========================================
-        // LOGIKA DETEKSI / RESET STATE AUTOMATIC (UI RENDERING)
-        // ==========================================
-        function renderDashboardBerdasarkanJadwal(dataUser) {
-            const configJadwal = dataUser.configJadwal;
-            const waktuRiilSekarang = dapatkanBulanTahunSekarang();
-            
-            if (labelBulanLanding) {
-                labelBulanLanding.innerText = `Periode Kas: ${waktuRiilSekarang}`;
-            }
-
-            // Jika configJadwal belum ada atau bulanTarget sudah usang (pergantian bulan baru)
-            if (!configJadwal || configJadwal.bulanTarget !== waktuRiilSekarang) {
-                console.log("[SYSTEM] Terdeteksi awal bulan baru! Sistem membutuhkan sinkronisasi ulang.");
-                
-                if (badgeStatusJadwal) {
-                    badgeStatusJadwal.innerText = "Jadwal Perlu Diperbarui";
-                    badgeStatusJadwal.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800";
-                }
-                
-                // Ubah behavior tombol simpan utama agar bertindak sebagai pemicu Reset State ke bulan baru
-                btnSave.innerText = `Inisialisasi Jadwal Periode ${waktuRiilSekarang}`;
-                btnSave.classList.replace('bg-indigo-600', 'bg-amber-600');
-                btnSave.classList.replace('hover:bg-indigo-700', 'hover:bg-amber-700');
-            } else {
-                console.log("[SYSTEM] Status jadwal sinkron dengan kalender sistem backend.");
-                
-                if (badgeStatusJadwal) {
-                    badgeStatusJadwal.innerText = configJadwal.statusPengaturan === "aktif" ? "Status: AKTIF" : "Status: NONAKTIF";
-                    badgeStatusJadwal.className = configJadwal.statusPengaturan === "aktif"
-                        ? "text-xs font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-800"
-                        : "text-xs font-bold px-2.5 py-1 rounded-full bg-gray-100 text-gray-800";
-                }
-                
-                btnSave.innerText = "Simpan Konfigurasi";
-                // Kembalikan ke warna indigo default jika sebelumnya sempat berubah
-                btnSave.classList.replace('bg-amber-600', 'bg-indigo-600');
-                btnSave.classList.replace('hover:bg-amber-700', 'hover:bg-indigo-700');
-            }
-        }
-
-        // ==========================================
-        // FUNGSI 1: Simpan Data Menggunakan Skema Baru + Multi-Hari
-        // ==========================================
-        btnSave.addEventListener('click', async () => {
-            btnSave.disabled = true;
-            btnSave.innerText = "Menyimpan...";
-
-            const waktuRiilSekarang = dapatkanBulanTahunSekarang();
-            
-            // Mengambil semua checkbox hari yang dicentang oleh user
-            const checkboxHari = document.querySelectorAll('input[name="hariAktif"]:checked');
-            const arrayHariAktif = Array.from(checkboxHari).map(cb => cb.value);
-
-            if (arrayHariAktif.length === 0 && botStatusCheckbox.checked) {
-                alert("Peringatan: Anda mengaktifkan bot, silakan pilih minimal satu hari pengingat!");
-                btnSave.disabled = false;
-                btnSave.innerText = "Simpan Konfigurasi";
-                return;
-            }
-            
-            const templateKonten = msgTemplateTextarea.value;
-            const barisPesan = templateKonten.split('\n\n');
-            const header = barisPesan[0] || "📢 HALO WARGA ORGANISASI!";
-            const footer = barisPesan.slice(1).join('\n\n') || "Yuk disegerakan bayar kas!";
-
+        /**
+         * 1. PROSES LOGIN (Google Sign-In)
+         */
+        btnLogin.addEventListener('click', async () => {
             try {
-                await setDoc(doc(db, "users", currentUserId), {
-                    namaOrganisasi: orgNameInput.value,
-                    configJadwal: {
-                        bulanTarget: waktuRiilSekarang,
-                        hariAktif: arrayHariAktif, // DISIMPAN SEBAGAI ARRAY SESUAI FASE 1
-                        headerPesan: header,
-                        footerPesan: footer,
-                        statusPengaturan: botStatusCheckbox.checked ? "aktif" : "nonaktif"
-                    }
-                }, { merge: true });
-
-                alert(`Konfigurasi periode ${waktuRiilSekarang} berhasil disimpan!`);
+                await signInWithPopup(auth, provider);
             } catch (error) {
-                console.error("Gagal menyimpan konfigurasi:", error);
-                alert("Terjadi kesalahan saat menyimpan data.");
-            } finally {
-                btnSave.disabled = false;
-                btnSave.innerText = "Simpan Konfigurasi";
+                console.error("Gagal Login:", error.message);
+                alert("Gagal masuk dengan Google. Silakan coba lagi.");
             }
         });
 
-        // ==========================================
-        // FUNGSI 2: Ambil Data Realtime Koleksi users/{id} & Sinkron Checkbox
-        // ==========================================
-        function listenToConfig() {
-            onSnapshot(doc(db, "users", currentUserId), (docSnap) => {
+        /**
+         * 2. PROSES LOGOUT
+         */
+        btnLogout.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("Gagal Logout:", error.message);
+            }
+        });
+
+        /**
+         * 3. MONITOR STATUS AUTENTIKASI (Real-time)
+         */
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Jika user berhasil masuk
+                loginSection.classList.add('hidden');
+                dashboardSection.classList.remove('hidden');
+                
+                // Set data profil bendahara
+                userAvatar.src = user.photoURL || 'https://via.placeholder.com/150';
+                userName.textContent = user.displayName;
+                userEmail.textContent = user.email;
+
+                // Ambil data konfigurasi grup WA dari Firestore milik user ini
+                fetchUserConfig(user.uid);
+            } else {
+                // Jika user keluar / belum login
+                loginSection.classList.remove('hidden');
+                dashboardSection.classList.add('hidden');
+            }
+        });
+
+        /**
+         * 4. AMBIL DATA GRUP TARGET DARI FIRESTORE
+         */
+        async function fetchUserConfig(uid) {
+            loadingData.classList.remove('hidden');
+            infoData.classList.add('hidden');
+
+            try {
+                // Mengambil dokumen berdasarkan UID user yang login
+                const docRef = doc(db, "users", uid);
+                const docSnap = await docRef.get();
+
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    orgNameInput.value = data.namaOrganisasi || "";
                     
-                    const config = data.configJadwal;
-                    if (config) {
-                        msgTemplateTextarea.value = `${config.headerPesan}\n\n${config.footerPesan}`;
-                        botStatusCheckbox.checked = config.statusPengaturan === "aktif";
-                        
-                        // Reset semua centang checkbox terlebih dahulu
-                        const allCheckboxes = document.querySelectorAll('input[name="hariAktif"]');
-                        allCheckboxes.forEach(cb => cb.checked = false);
+                    // Render data Green API & Config Jadwal
+                    const groupID = data.greenApiConfig?.nomorTujuan || "Belum diatur";
+                    txtTargetGroup.textContent = groupID;
+                    
+                    const status = data.configJadwal?.statusPengaturan || "tidak aktif";
+                    txtStatusJadwal.textContent = status.toUpperCase();
+                    txtStatusJadwal.className = status === 'aktif' 
+                        ? "px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-800 w-fit"
+                        : "px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-800 w-fit";
 
-                        // Centang ulang checkbox berdasarkan array hariAktif dari DB
-                        if (config.hariAktif && Array.isArray(config.hariAktif)) {
-                            config.hariAktif.forEach(hari => {
-                                const cb = document.querySelector(`input[name="hariAktif"][value="${hari}"]`);
-                                if (cb) cb.checked = true;
-                            });
-                        }
-                        
-                        // Jalankan deteksi state awal bulan
-                        renderDashboardBerdasarkanJadwal(data);
-                    }
+                    const hari = data.configJadwal?.hariAktif ? data.configJadwal.hariAktif.join(', ') : '-';
+                    txtHariAktif.textContent = hari;
+
+                    const bulan = data.configJadwal?.bulanTarget || "-";
+                    txtBulanTarget.textContent = bulan;
+
+                } else {
+                    // Jika user baru daftar dan dokumennya belum ada di Firestore
+                    txtTargetGroup.textContent = "Data baru! Hubungi Admin untuk mendaftarkan ID Grup WA Anda.";
+                    txtStatusJadwal.textContent = "BELUM DISET";
+                    txtHariAktif.textContent = "-";
+                    txtBulanTarget.textContent = "-";
                 }
-            });
+            } catch (error) {
+                console.error("Gagal memuat data Firestore:", error);
+            } finally {
+                loadingData.classList.add('hidden');
+                infoData.classList.remove('hidden');
+            }
         }
-
-        // ==========================================
-        // FUNGSI 3: Ambil Daftar Anggota Secara Realtime
-        // ==========================================
-        function listenToMembers() {
-            // Tetap mengarah ke sub-koleksi members dalam root user terkait
-            const membersRef = collection(db, "users", currentUserId, "members");
-            
-            onSnapshot(membersRef, (snapshot) => {
-                memberTableBody.innerHTML = "";
-                let count = 0;
-
-                snapshot.forEach((docSnap) => {
-                    count++;
-                    const member = docSnap.data();
-                    const memberId = docSnap.id;
-
-                    const row = document.createElement('tr');
-                    row.className = "hover:bg-gray-50/50 transition-colors";
-                    row.innerHTML = `
-                        <td class="px-6 py-4 font-medium text-gray-900">${member.namaAnggota}</td>
-                        <td class="px-6 py-4 text-gray-600">${member.nomorWa}</td>
-                        <td class="px-6 py-4 text-right">
-                            <button data-id="${memberId}" class="btn-delete text-red-600 hover:text-red-800 font-medium transition cursor-pointer">Hapus</button>
-                        </td>
-                    `;
-                    memberTableBody.appendChild(row);
-                });
-
-                memberCountSpan.innerText = `${count} Anggota`;
-
-                document.querySelectorAll('.btn-delete').forEach(button => {
-                    button.addEventListener('click', async (e) => {
-                        const id = e.target.getAttribute('data-id');
-                        if (confirm("Apakah kamu yakin ingin menghapus anggota ini?")) {
-                            await deleteDoc(doc(db, "users", currentUserId, "members", id));
-                        }
-                    });
-                });
-            });
-        }
-
-        // Jalankan semua listener data
-        listenToConfig();
-        listenToMembers();
     </script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans min-h-screen flex flex-col justify-center items-center p-4">
+
+    <!-- ================= SECTION 1: HALAMAN LOGIN ================= -->
+    <div id="login-section" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center border border-gray-100">
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">Bot Pengingat Kas</h2>
+        <p class="text-sm text-gray-500 mb-6">Khusus Bendahara Kelas / Organisasi. Masuk untuk mengelola jadwal pengiriman pesan otomatis.</p>
+        
+        <button id="btn-login" class="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-4 rounded-xl shadow-sm transition duration-150 cursor-pointer">
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google Logo" class="w-5 h-5">
+            Masuk dengan Google
+        </button>
+    </div>
+
+    <!-- ================= SECTION 2: DASHBOARD UTAMA ================= -->
+    <div id="dashboard-section" class="w-full max-w-2xl bg-white rounded-2xl shadow-xl p-6 border border-gray-100 hidden">
+        
+        <!-- Header Dashboard: Info Bendahara & Tombol Keluar -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-100 pb-6 mb-6">
+            <div class="flex items-center gap-4">
+                <img id="user-avatar" src="" alt="Avatar" class="w-12 h-12 rounded-full ring-2 ring-gray-100">
+                <div>
+                    <h1 id="userName" class="text-lg font-bold text-gray-900">Selamat Datang, <span id="user-name">Bendahara</span>! 👋</h1>
+                    <p id="user-email" class="text-xs text-gray-500">email@gmail.com</p>
+                </div>
+            </div>
+            <button id="btn-logout" class="text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg transition cursor-pointer">
+                Keluar Aplikasi
+            </button>
+        </div>
+
+        <!-- Konten Utama: Status Bot & Target Group -->
+        <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-gray-400 mb-4">Status & Target Monitor</h3>
+            
+            <!-- State Loading Data -->
+            <div id="loading-data" class="text-center py-6 text-sm text-gray-400">
+                Memuat data grup WhatsApp dari server...
+            </div>
+
+            <!-- Detail Grup Tujuan -->
+            <div id="info-data" class="grid grid-cols-1 md:grid-cols-2 gap-4 hidden">
+                
+                <!-- Card ID Grup Terhubung -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs font-medium text-gray-400 block mb-1">Grup WhatsApp Target</span>
+                        <p id="target-group" class="text-sm font-mono font-bold text-gray-800 break-all">Memuat...</p>
+                    </div>
+                    <div class="mt-4">
+                        <span class="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-medium">Green-API Connected</span>
+                    </div>
+                </div>
+
+                <!-- Card Detail Aturan Cron -->
+                <div class="bg-gray-50 p-4 rounded-xl border border-gray-100 space-y-3">
+                    <div>
+                        <span class="text-xs font-medium text-gray-400 block mb-0.5">Status Pengingat</span>
+                        <div id="txt-status-container">
+                            <span id="status-jadwal" class="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-600">CHECKING...</span>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="text-xs font-medium text-gray-400 block mb-0.5">Hari Pengiriman</span>
+                        <p id="hari-aktif" class="text-sm font-semibold text-gray-700">-</p>
+                    </div>
+                    <div>
+                        <span class="text-xs font-medium text-gray-400 block mb-0.5">Target Bulan Ini</span>
+                        <p id="bulan-target" class="text-sm font-semibold text-gray-700">-</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
 
 </body>
 </html>

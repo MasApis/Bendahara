@@ -1,31 +1,33 @@
-name: Bot Pengingat Kas Otomatis
+name: Bot Pengingat Kas Otomatis Cron
 
 on:
   schedule:
-    # Berjalan otomatis setiap hari jam 01:00 UTC (Sama dengan Jam 08:00 WIB pagi)
-    - cron: '0 1 * * *'
-  workflow_dispatch: # Tombol rahasia agar bisa tes jalankan manual
+    # Berjalan setiap hari Senin, Kamis, dan Sabtu jam 07:30 WIB (00:30 UTC)
+    # Sesuaikan menit/jam sesuai preferensi distribusi broadcast Anda
+    - cron: '30 0 * * 1,4,6'
+  workflow_dispatch: # Memungkinkan trigger manual dari dashboard GitHub untuk testing
 
 jobs:
-  run-bot:
+  run-reminder:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    - name: Checkout Repository
+      uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20' # PERBAIKAN: Menggunakan properti 'node-version' yang valid
 
-      - name: Install Dependencies
-        run: npm install
+    - name: Install Dependencies
+      run: |
+        npm install firebase-admin axios
 
-      - name: Eksekusi Bot Pengingat
-        env:
-          TZ: Asia/Jakarta
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          GREEN_API_INSTANCE_ID: ${{ secrets.GREEN_API_INSTANCE_ID }}
-          GREEN_API_API_TOKEN: ${{ secrets.GREEN_API_API_TOKEN }}
-          GREEN_API_CHAT_ID: ${{ secrets.GREEN_API_CHAT_ID }}
-        run: node cron-reminder.js
+    - name: Eksekusi Skrip dengan Zona Waktu Asia/Jakarta
+      env:
+        # Kunci utama agar kalender sistem di NodeJS membaca waktu Indonesia
+        TZ: 'Asia/Jakarta'
+        # Taruh Service Account Firebase Anda di GitHub Secrets demi keamanan SaaS
+        FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      run: node cron-reminder.js

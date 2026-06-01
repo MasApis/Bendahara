@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gabung Grup Kas - KasReminder</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-50 flex items-center justify-center min-h-screen p-4 font-sans antialiased">
+
+    <div class="bg-white p-8 rounded-2xl border border-gray-200 shadow-sm max-w-md w-full space-y-6">
+        <div class="text-center space-y-2">
+            <span class="text-4xl">📝</span>
+            <h1 class="text-2xl font-bold tracking-tight text-gray-900">Pendaftaran Uang Kas</h1>
+            <p class="text-sm text-gray-500">Masukkan data dirimu untuk didaftarkan ke dalam sistem pengingat otomatis <span id="org-target-name" class="font-semibold text-indigo-600">Memuat...</span></p>
+        </div>
+
+        <form id="form-join" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                <input type="text" id="member-name" required placeholder="Contoh: Fachrezi Bachri" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nomor WhatsApp</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400 text-sm font-medium select-none">+62</span>
+                    <input type="number" id="member-phone" required placeholder="81234567xxx (Tanpa angka 0 di depan)" class="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Pastikan nomor aktif agar bot pengingat bisa mengirim pesan dengan tepat.</p>
+            </div>
+
+            <button type="submit" id="btn-submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition shadow-sm text-sm">
+                Daftarkan Diri
+            </button>
+        </form>
+
+        <div id="success-message" class="hidden text-center p-4 bg-green-50 border border-green-100 rounded-xl space-y-2">
+            <span class="text-2xl">✅</span>
+            <h3 class="font-bold text-green-800">Berhasil Terdaftar!</h3>
+            <p class="text-xs text-green-600">Data kamu sudah masuk ke sistem bendahara. Kamu bisa menutup halaman ini sekarang.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        // Konfigurasi Firebase milikmu
+        const firebaseConfig = {
+            apiKey: "AIzaSyCIg-Cz0Up6wsxnkwknENR_durvd82MukA",
+            authDomain: "bendahara-bcf09.firebaseapp.com",
+            projectId: "bendahara-bcf09",
+            storageBucket: "bendahara-bcf09.firebasestorage.app",
+            messagingSenderId: "242756926048",
+            appId: "1:242756926048:web:b1e0e35eec1db1339ba105",
+            measurementId: "G-X4JGK2PH32"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Ambil parameter ID User/Organisasi dari URL (?org=ORG_123)
+        const urlParams = new URLSearchParams(window.location.search);
+        const orgId = urlParams.get('org') || "ORG_123";
+
+        const orgTargetName = document.getElementById('org-target-name');
+        const formJoin = document.getElementById('form-join');
+        const btnSubmit = document.getElementById('btn-submit');
+        const successMessage = document.getElementById('success-message');
+
+        // ==========================================
+        // 1. Ambil Nama Organisasi dari Koleksi 'users'
+        // ==========================================
+        async function getOrgInfo() {
+            try {
+                // MIGRASI: Mengubah target dokumen dari "organizations" ke "users"
+                const docSnap = await getDoc(doc(db, "users", orgId));
+                if (docSnap.exists()) {
+                    orgTargetName.innerText = docSnap.data().namaOrganisasi || "Tanpa Nama Organisasi";
+                } else {
+                    orgTargetName.innerText = "Organisasi Tidak Ditemukan";
+                }
+            } catch (error) {
+                console.error("Gagal memuat info organisasi:", error);
+                orgTargetName.innerText = "Error memuat data";
+            }
+        }
+
+        // ==========================================
+        // 2. Event Listener Submit Form Anggota
+        // ==========================================
+        formJoin.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            btnSubmit.disabled = true;
+            btnSubmit.innerText = "Mendaftarkan...";
+
+            const inputNama = document.getElementById('member-name').value;
+            let inputPhone = document.getElementById('member-phone').value.toString();
+
+            // Bersihkan format nomor hp ke standar internasional (62xxx)
+            if (inputPhone.startsWith('0')) {
+                inputPhone = '62' + inputPhone.slice(1);
+            } else if (inputPhone.startsWith('+62')) {
+                inputPhone = '62' + inputPhone.slice(3);
+            } else if (!inputPhone.startsWith('62')) {
+                inputPhone = '62' + inputPhone;
+            }
+
+            try {
+                // MIGRASI: Menyimpan data anggota ke sub-koleksi 'members' di dalam dokumen 'users'
+                await addDoc(collection(db, "users", orgId, "members"), {
+                    namaAnggota: inputNama,
+                    nomorWa: inputPhone,
+                    registeredAt: new Date().toISOString()
+                });
+
+                // Sembunyikan form dan tampilkan pesan sukses
+                formJoin.classList.add('hidden');
+                successMessage.classList.remove('hidden');
+            } catch (error) {
+                console.error("Gagal mendaftar:", error);
+                alert("Terjadi masalah saat mendaftar, coba lagi.");
+                btnSubmit.disabled = false;
+                btnSubmit.innerText = "Daftarkan Diri";
+            }
+        });
+
+        getOrgInfo();
+    </script>
+</body>
+</html>

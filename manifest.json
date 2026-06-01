@@ -1,0 +1,17 @@
+{
+  "short_name": "KasBot Pro",
+  "name": "KasBot Pro - Asisten Bendahara",
+  "icons": [
+    {
+      "src": "https://ui-avatars.com/api/?name=KasBot&background=10b981&color=fff&size=512",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0f172a",
+  "theme_color": "#10b981",
+  "display": "standalone",
+  "orientation": "portrait"
+}

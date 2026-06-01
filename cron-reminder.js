@@ -41,7 +41,7 @@ async function runCronReminder() {
     
     try {
         // FASE 2: Validasi Level 1 - Query Firestore menggunakan array-contains & status aktif
-        const usersRef = db.collection('users'); // Sesuaikan dengan nama koleksi Anda
+        const usersRef = db.collection('users'); 
         const snapshot = await usersRef
             .where('configJadwal.statusPengaturan', '==', 'aktif')
             .where('configJadwal.hariAktif', 'array-contains', hariIni)
@@ -66,11 +66,7 @@ async function runCronReminder() {
                 continue; 
             }
 
-            // --- PROSES LANJUTAN: Eksekusi pengiriman via Green-API jika lolos kedua validasi ---
-            console.log(`[VALIDASI LOLOS] Memproses pengiriman pengingat untuk User ID: ${userId}`);
-            
-            // Contoh payload pesan menggabungkan header dan footer baru
-            // --- PROSES LANJUTAN: Eksekusi pengiriman via Green-API jika lolos kedua validasi ---
+            // --- PROSES LIVE: Eksekusi pengiriman via Green-API jika lolos kedua validasi ---
             console.log(`[VALIDASI LOLOS] Memproses pengiriman pengingat untuk User ID: ${userId}`);
             
             // Menggabungkan template pesan baru (Fase 1) dengan rapi
@@ -79,11 +75,18 @@ async function runCronReminder() {
             try {
                 const { idInstance, apiTokenInstance, nomorTujuan } = data.greenApiConfig;
                 
-                // Validasi format chatId: Jika mengandung "@us.c", berarti itu ID grup, 
-                // jika hanya angka, kita format sebagai nomor personal (@c.us)
-                const chatId = nomorTujuan.includes('@us.c') 
-                    ? nomorTujuan 
-                    : `${nomorTujuan}@c.us`;
+                // ==========================================
+                // FIX BUG 1: Pembersihan & Validasi String chatId
+                // ==========================================
+                let chatId = nomorTujuan.trim();
+                
+                if (chatId.includes('@g.us')) {
+                    // Jika data di DB sudah berakhiran @g.us, bersihkan dari kemungkinan ketempelan @c.us
+                    chatId = chatId.replace('@c.us', '');
+                } else if (!chatId.includes('@')) {
+                    // Jika hanya nomor mentah (tanpa @g.us / @c.us), arahkan sebagai nomor personal
+                    chatId = `${chatId}@c.us`;
+                }
 
                 const url = `https://api.green-api.com/waInstance${idInstance}/sendMessage/${apiTokenInstance}`;
                 const payload = {
@@ -91,15 +94,26 @@ async function runCronReminder() {
                     message: pesanKonten
                 };
 
-                // Untuk keperluan SIMULASI (Dry-Run), baris axios di-comment dulu.
-                // Jika sudah siap live, cukup hapus tanda comment (//) di bawah ini:
-                // await axios.post(url, payload); 
+                // ==========================================
+                // FIX BUG 2: AKTIFKAN MODAL LIVE PRODUCTION (POST AXIOS)
+                // ==========================================
+                console.log(`[SENDING] Mengirim pesan nyata ke Green-API untuk target: ${chatId}...`);
+                
+                const response = await axios.post(url, payload, {
+                    headers: { 'Content-Type': 'application/json' }
+                });
 
-                console.log(`[DRY-RUN SUCCESS] Payload siap dikirim ke ${chatId}`);
-                console.log(`[ISI PESAN]:\n---------\n${pesanKonten}\n---------`);
+                if (response.status === 200 || response.data.idMessage) {
+                    console.log(`[LIVE SUCCESS] Pesan berhasil terkirim! Message ID: ${response.data.idMessage}`);
+                } else {
+                    console.warn(`[WARNING] Respon diterima tetapi ada keanehan struktur data:`, response.data);
+                }
                 
             } catch (apiError) {
                 console.error(`[GREEN-API ERROR] Gagal memproses data untuk User: ${userId}:`, apiError.message);
+                if (apiError.response) {
+                    console.error(`[DETAIL API ERROR]:`, apiError.response.data);
+                }
             }
         }
 

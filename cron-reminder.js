@@ -21,38 +21,35 @@ const db = admin.firestore();
 /**
  * Helper untuk mendapatkan nama Hari, "Bulan Tahun", dan Jam sistem saat ini (WIB).
  */
+// GANTI FUNGSI INI SECARA UTUH:
 function getSystemDateTime() {
     const now = new Date();
-    
-    // Fungsi format khusus untuk zona waktu Jakarta (WIB)
     const formatStr = (opts) => new Intl.DateTimeFormat('id-ID', { timeZone: 'Asia/Jakarta', ...opts }).format(now);
     
-    const hariIni = formatStr({ weekday: 'long' }); // ex: "Kamis"
-    const bulanIni = formatStr({ month: 'long' }); // ex: "Juni"
-    const tahunIni = formatStr({ year: 'numeric' }); // ex: "2026"
-    const bulanTahunIni = `${bulanIni} ${tahunIni}`; // ex: "Juni 2026"
+    const hariIni = formatStr({ weekday: 'long' }); 
+    const bulanIni = formatStr({ month: 'long' }); 
+    const tahunIni = formatStr({ year: 'numeric' }); 
+    const bulanTahunIni = `${bulanIni} ${tahunIni}`; 
     
-    // Ambil jam (2 digit) dan paskan menit ke 00 untuk validasi jadwal
-    let jam = formatStr({ hour: '2-digit', hour12: false }).replace('.', ':');
-    const jamIni = `${jam.split(':')[0]}:00`; // ex: "08:00" atau "20:00"
+    // Ambil tanggal format standar ISO Jakarta (ex: 2026-06-02) untuk pengunci status blast
+    const tanggalIni = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' }); 
     
-    return { hariIni, bulanTahunIni, jamIni };
+    return { hariIni, bulanTahunIni, tanggalIni };
 }
-
 /**
  * Fungsi utama Backend Cron Reminder (Fase 2: Multi-Bulan, Multi-Grup, Waktu Dinamis)
  */
+// CARI DI DALAM RUNCRONREMINDER(), GANTI PROSES LOOPING USER MENJADI SEPERTI INI:
 async function runCronReminder() {
-    const { hariIni, bulanTahunIni, jamIni } = getSystemDateTime();
+    const { hariIni, bulanTahunIni, tanggalIni } = getSystemDateTime();
     
     console.log(`\n===================================================================`);
-    console.log(`[CRON START] Waktu Server WIB: ${hariIni}, ${bulanTahunIni} | Jam: ${jamIni}`);
+    console.log(`[CRON START] Waktu Server WIB: ${hariIni}, ${bulanTahunIni} | Tanggal: ${tanggalIni}`);
     console.log(`===================================================================`);
     
     try {
         const usersRef = db.collection('users'); 
         
-        // FASE 2: Validasi Level 1 - Query dinamis ke Map schedulesByMonth berdasarkan bulan saat ini
         const fieldStatus = `schedulesByMonth.${bulanTahunIni}.statusPengaturan`;
         const fieldHari = `schedulesByMonth.${bulanTahunIni}.hariAktif`;
 
@@ -66,19 +63,16 @@ async function runCronReminder() {
             return;
         }
 
-        console.log(`[CRON INFO] Menemukan ${snapshot.size} user potensial. Memulai Validasi Level 2 (Jam Eksekusi)...`);
+        console.log(`[CRON INFO] Menemukan ${snapshot.size} user potensial. Memulai Validasi Level 2 (Tanggal Eksekusi)...`);
 
-        // Iterasi setiap user yang lolos filter hari
         for (const doc of snapshot.docs) {
             const data = doc.data();
             const userId = doc.id;
-            
-            // Ambil jadwal spesifik untuk bulan berjalan
             const configBulanIni = data.schedulesByMonth[bulanTahunIni];
 
-            // FASE 2: Validasi Level 2 - Mencocokkan Jam Eksekusi Bendahara dengan Jam Server
-            if (configBulanIni.jamEksekusi !== jamIni) {
-                console.log(`[VALIDASI SKIP] User: ${userId} -> Jadwalnya jam ${configBulanIni.jamEksekusi}, bukan jam ${jamIni}`);
+            // VALIDASI LEVEL 2: Cek apakah hari ini user tersebut sudah sukses dikirimi blast
+            if (configBulanIni.lastExecutionDate === tanggalIni) {
+                console.log(`[VALIDASI SKIP] User: ${userId} -> Hari ${hariIni} ini sudah sukses dieksekusi sebelumnya.`);
                 continue; 
             }
 
@@ -90,7 +84,6 @@ async function runCronReminder() {
                 continue;
             }
 
-            // FASE 2: Ambil daftar multi-grup (Fallback ke konfigurasi lama jika bendahara belum update)
             let listTargetGrup = greenApi.selectedGroups || [];
             if (listTargetGrup.length === 0 && greenApi.nomorTujuan) {
                 listTargetGrup.push({ id: greenApi.nomorTujuan, name: greenApi.namaGrupTerpilih || "Grup Utama" });
@@ -102,15 +95,14 @@ async function runCronReminder() {
             }
 
             const templatePesan = configBulanIni.templatePesan || "";
+            let semuaGrupSukses = true;
 
-            // --- PROSES LIVE: Eksekusi Blast ke Semua Grup Terpilih ---
+            // --- PROSES LIVE: Eksekusi Blast ---
             for (const target of listTargetGrup) {
-                // 1. Auto-Replace Variabel Dinamis [BULAN] dan [NAMA_GRUP]
                 let pesanFinal = templatePesan
                     .replace(/\[BULAN\]/g, bulanTahunIni)
                     .replace(/\[NAMA_GRUP\]/g, target.name);
 
-                // 2. Pembersihan & Validasi String chatId
                 let chatId = target.id.trim();
                 if (chatId.includes('@g.us')) {
                     chatId = chatId.replace('@c.us', '');
@@ -119,10 +111,7 @@ async function runCronReminder() {
                 }
 
                 const url = `https://api.green-api.com/waInstance${greenApi.idInstance}/sendMessage/${greenApi.apiTokenInstance}`;
-                const payload = {
-                    chatId: chatId,
-                    message: pesanFinal
-                };
+                const payload = { chatId: chatId, message: pesanFinal };
 
                 console.log(`[SENDING] -> Menembak ke Grup: ${target.name} (${chatId})`);
 
@@ -133,20 +122,24 @@ async function runCronReminder() {
 
                     if (response.status === 200 || response.data.idMessage) {
                         console.log(`[LIVE SUCCESS] Pesan terkirim! Message ID: ${response.data.idMessage}`);
-                    } else {
-                        console.warn(`[WARNING] Respon diterima tetapi ada keanehan struktur data:`, response.data);
                     }
                 } catch (apiError) {
+                    semuaGrupSukses = false;
                     console.error(`[GREEN-API ERROR] Gagal mengirim ke ${target.name}:`, apiError.message);
-                    if (apiError.response) {
-                        console.error(`[DETAIL API ERROR]:`, apiError.response.data);
-                    }
                 }
+            }
+
+            // JIKA SEMUA GRUP SUKSES DITEMBAK, KUNCI TANGGALNYA DI FIRESTORE USER
+            if (semuaGrupSukses) {
+                const userDocRef = db.collection('users').doc(userId);
+                await userDocRef.update({
+                    [`schedulesByMonth.${bulanTahunIni}.lastExecutionDate`]: tanggalIni
+                });
+                console.log(`[FIRESTORE LOCKED] Status sukses hari ini dikunci untuk user ${userId}`);
             }
         }
 
         console.log(`\n[CRON END] Seluruh proses blast pesan selesai.`);
-
     } catch (error) {
         console.error(`[CRON CRITICAL ERROR] Terjadi kegagalan sistem pada backend:`, error);
     }

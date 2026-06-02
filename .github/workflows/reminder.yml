@@ -4,7 +4,7 @@ on:
   schedule:
     # Berjalan setiap hari Senin, Kamis, dan Sabtu jam 07:30 WIB (00:30 UTC)
     # Sesuaikan menit/jam sesuai preferensi distribusi broadcast Anda
-    - cron: '0 * * * *' # Jalan tiap menit ke-0 di setiap jam
+    - cron: '0 1 * * *' # Jalan tiap menit ke-0 di setiap jam
   workflow_dispatch: # Memungkinkan trigger manual dari dashboard GitHub untuk testing
 
 jobs:

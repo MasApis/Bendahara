@@ -325,14 +325,13 @@
 
         function loadDanEditJadwalBulan(bulan) {
             const data = localSchedulesObject[bulan];
-            const jamSelect = document.getElementById('jam-eksekusi');
             const inputTemplate = document.getElementById('template-pesan');
             if (data) {
-                jamSelect.value = data.jamEksekusi || "08:00";
+                // Hapus baris jamSelect.value
                 inputTemplate.value = data.templatePesan || "";
                 document.querySelectorAll('.check-hari').forEach(cb => cb.checked = (data.hariAktif || []).includes(cb.value));
             } else {
-                jamSelect.value = "08:00";
+                // Hapus baris jamSelect.value
                 document.querySelectorAll('.check-hari').forEach(cb => cb.checked = false);
                 inputTemplate.value = "Halo kawan-kawan [NAMA_GRUP]! 👋\n\nIni adalah pengingat otomatis untuk kas periode *[BULAN]*.\n\nMohon bagi yang belum melunasi agar segera transfer ke:\nBCA: 12345678 a.n Bendahara\n\nTerima kasih! 🙏";
             }
@@ -345,13 +344,11 @@
             if (!user) return;
 
             const bulanTerpilih = document.getElementById('bulan-target').value;
-            const jamTerpilih = document.getElementById('jam-eksekusi').value;
             const teksTemplate = document.getElementById('template-pesan').value;
             const hariTerpilih = [];
             document.querySelectorAll('.check-hari:checked').forEach(cb => hariTerpilih.push(cb.value));
 
             localSchedulesObject[bulanTerpilih] = {
-                jamEksekusi: jamTerpilih,
                 statusPengaturan: "aktif",
                 hariAktif: hariTerpilih,
                 templatePesan: teksTemplate,
@@ -543,15 +540,10 @@
                                     <select id="bulan-target" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm cursor-pointer"></select>
                                 </div>
 
-                                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50">
-                                    <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Jam Eksekusi (WIB)</label>
-                                    <select id="jam-eksekusi" class="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none shadow-sm cursor-pointer">
-                                        <option value="01:00">01:00 Subuh (Test Mode)</option> 
-                                        <option value="02:00">02:00 Subuh (Test Mode)</option>
-                                        <option value="08:00" selected>08:00 Pagi</option>
-                                        <option value="12:00">12:00 Siang</option>
-                                        <option value="20:00">20:00 Malam</option>
-                                    </select>
+                                <div class="p-4 rounded-xl border border-slate-200 bg-indigo-50/50 flex flex-col justify-center">
+                                    <label class="block text-[11px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Metode Eksekusi</label>
+                                    <p class="text-xs font-bold text-indigo-900 leading-tight">⚡ Auto-Blast System</p>
+                                    <p class="text-[10px] text-indigo-600 mt-0.5">Pesan dikirim otomatis pada hari yang dipilih tanpa antrean jam.</p>
                                 </div>
                             </div>
 
